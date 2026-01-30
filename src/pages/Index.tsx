@@ -96,7 +96,7 @@ const Index = () => {
         <Button
           size="lg"
           className="w-full h-14 rounded-2xl text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-          onClick={() => navigate("/role-selection")}
+          onClick={() => navigate("/auth")}
           style={{ position: "relative", zIndex: 1000 }}>
           Эхлэх
           <ArrowRight className="w-5 h-5 ml-2" />

@@ -44,7 +44,7 @@ export function ServiceWorkerCard({
         </div>
         <div className="text-right">
           <span className="text-sm font-bold text-primary">
-            ₮{worker.hourlyRate.toLocaleString()}
+            ₮{worker.hourlyRate?.toLocaleString()}
           </span>
           <span className="text-2xs text-muted-foreground block">/цаг</span>
         </div>
@@ -86,7 +86,7 @@ export function ServiceWorkerCard({
         </div>
         <div className="text-right">
           <span className="text-lg font-bold text-primary">
-            ₮{worker.hourlyRate.toLocaleString()}
+            ₮{worker.hourlyRate?.toLocaleString()}
           </span>
           <span className="text-xs text-muted-foreground block">/цаг</span>
         </div>

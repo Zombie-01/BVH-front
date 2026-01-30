@@ -103,7 +103,7 @@ export default function WorkerChatDetail() {
       chatId: id || "1",
       senderId: "worker-1",
       senderRole: "worker",
-      content: `${price.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+      content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
       createdAt: new Date(),
       read: false,
       messageType: "deal_accepted",
@@ -141,7 +141,7 @@ export default function WorkerChatDetail() {
       chatId: id || "1",
       senderId: "worker-1",
       senderRole: "worker",
-      content: `${price.toLocaleString()}₮ санал болгож байна`,
+      content: `${price?.toLocaleString()}₮ санал болгож байна`,
       createdAt: new Date(),
       read: false,
       messageType: "price_proposal",
@@ -161,7 +161,7 @@ export default function WorkerChatDetail() {
           chatId: id || "1",
           senderId: "user-1",
           senderRole: "user",
-          content: `${userCounter.toLocaleString()}₮ санал болгож байна`,
+          content: `${userCounter?.toLocaleString()}₮ санал болгож байна`,
           createdAt: new Date(),
           read: true,
           messageType: "price_proposal",
@@ -234,7 +234,7 @@ export default function WorkerChatDetail() {
           <div className="bg-green-500/10 border border-green-500 px-4 py-2 rounded-full">
             <p className="text-sm text-green-600 font-medium flex items-center gap-2">
               <Check className="w-4 h-4" />
-              {message.dealAmount?.toLocaleString()}₮ тохиролцсон
+              {message.dealAmount}₮ тохиролцсон
             </p>
           </div>
         </motion.div>
@@ -340,8 +340,8 @@ export default function WorkerChatDetail() {
                 variant={chatStatus === "agreed" ? "default" : "secondary"}
                 className={chatStatus === "agreed" ? "bg-green-500" : ""}>
                 {agreedPrice
-                  ? `${agreedPrice.toLocaleString()}₮`
-                  : `~${serviceRequest.expectedPrice.toLocaleString()}₮`}
+                  ? `${agreedPrice?.toLocaleString()}₮`
+                  : `~${serviceRequest.expectedPrice?.toLocaleString()}₮`}
               </Badge>
               {showServiceHeader ? (
                 <ChevronUp className="w-4 h-4" />
@@ -408,7 +408,7 @@ export default function WorkerChatDetail() {
               </div>
 
               <p className="text-2xl font-bold text-primary mb-4">
-                {pendingProposal.toLocaleString()}₮
+                {pendingProposal?.toLocaleString()}₮
               </p>
 
               {!showCounterInput ? (
@@ -474,7 +474,7 @@ export default function WorkerChatDetail() {
                 <div>
                   <h3 className="font-bold text-lg">Ажил баталгаажлаа!</h3>
                   <p className="text-white/80">
-                    Тохирсон үнэ: {agreedPrice.toLocaleString()}₮
+                    Тохирсон үнэ: {agreedPrice?.toLocaleString()}₮
                   </p>
                 </div>
               </div>

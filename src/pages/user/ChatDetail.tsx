@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,13 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage, OrderItem } from "@/types";
-import {
-  mockChats,
-  mockChatMessages,
-  mockStores,
-  mockServiceWorkers,
-  mockOrders,
-} from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Store, ServiceWorker, Order } from "@/types";
 import { UserPriceInput } from "@/components/chat/UserPriceInput";
 import { PriceProposalCard } from "@/components/chat/PriceProposalCard";
 import { DealConfirmedCard } from "@/components/chat/DealConfirmedCard";
@@ -46,28 +44,161 @@ const ChatDetail = () => {
       serviceDescription?: string;
     }) || {};
 
-  // Find existing chat or create new one
-  const existingChat = mockChats.find((c) => c.id === id);
-  const chatMessages = id ? mockChatMessages[id] || [] : [];
+  // Find existing chat or create new one (DB-backed). state covers new-chat flows.
+  const { user, profile } = useAuth();
+  const [existingChat, setExistingChat] = useState<
+    Database["public"]["Tables"]["chats"]["Row"] | null
+  >(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [store, setStore] = useState<Store | null>(null);
+  const [worker, setWorker] = useState<ServiceWorker | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const store = state.storeId
-    ? mockStores.find((s) => s.id === state.storeId)
-    : existingChat?.storeId
-    ? mockStores.find((s) => s.id === existingChat.storeId)
-    : null;
-  const worker = state.workerId
-    ? mockServiceWorkers.find((w) => w.id === state.workerId)
-    : existingChat?.workerId
-    ? mockServiceWorkers.find((w) => w.id === existingChat.workerId)
-    : null;
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!id) return;
+      setLoading(true);
 
+      // new chat (client-only) - prefilled from location.state
+      if (id.startsWith("new-")) {
+        const storeId = id.replace("new-", "");
+        if (storeId) {
+          const { data: storeRow } = (await supabase
+            .from("stores")
+            .select("*")
+            .eq("id", storeId)
+            .maybeSingle()) as {
+            data: Database["public"]["Tables"]["stores"]["Row"] | null;
+            error: unknown;
+          };
+          if (storeRow && mounted) {
+            setStore({
+              id: storeRow.id,
+              name: storeRow.name,
+              description: storeRow.description ?? "",
+              image: storeRow.image ?? "",
+              rating: storeRow.rating ?? 0,
+              reviewCount: storeRow.review_count ?? 0,
+              category:
+                (storeRow.categories && storeRow.categories[0]) || "other",
+              location: storeRow.location ?? "",
+              isOpen: storeRow.is_open,
+              phone: storeRow.phone ?? undefined,
+            });
+          }
+          setMessages([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // existing chat - load from DB
+      const { data: chatRow } = (await supabase
+        .from("chats")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chats"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (chatRow && mounted) {
+        setExistingChat(chatRow);
+        if (chatRow.store_id) {
+          const { data: storeRow } = (await supabase
+            .from("stores")
+            .select("*")
+            .eq("id", chatRow.store_id)
+            .maybeSingle()) as {
+            data: Database["public"]["Tables"]["stores"]["Row"] | null;
+            error: unknown;
+          };
+          if (storeRow) {
+            setStore({
+              id: storeRow.id,
+              name: storeRow.name,
+              description: storeRow.description ?? "",
+              image: storeRow.image ?? "",
+              rating: storeRow.rating ?? 0,
+              reviewCount: storeRow.review_count ?? 0,
+              category:
+                (storeRow.categories && storeRow.categories[0]) || "other",
+              location: storeRow.location ?? "",
+              isOpen: storeRow.is_open,
+              phone: storeRow.phone ?? undefined,
+            });
+          }
+        }
+
+        if (chatRow.worker_id) {
+          const { data: workerRow } = (await supabase
+            .from("service_workers")
+            .select("*")
+            .eq("id", chatRow.worker_id)
+            .maybeSingle()) as {
+            data: Database["public"]["Tables"]["service_workers"]["Row"] | null;
+            error: unknown;
+          };
+          if (workerRow) {
+            setWorker({
+              id: workerRow.id,
+              name: "",
+              avatar: "",
+              specialty: workerRow.specialty,
+              rating: workerRow.rating ?? 0,
+              completedJobs: workerRow.completed_jobs ?? 0,
+              badges: workerRow.badges ?? [],
+              hourlyRate: workerRow.hourly_rate ?? 0,
+              isAvailable: workerRow.is_available,
+            });
+          }
+        }
+
+        // fetch messages
+        const { data: msgs } = (await supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("chat_id", id)
+          .order("created_at", { ascending: true })) as {
+          data: Database["public"]["Tables"]["chat_messages"]["Row"][] | null;
+          error: unknown;
+        };
+
+        if (msgs && mounted) {
+          const mapped = msgs.map((m) => ({
+            id: m.id,
+            chatId: m.chat_id,
+            senderId: m.sender_id,
+            senderRole: m.sender_role,
+            content: m.content ?? "",
+            imageUrl: m.image_url ?? undefined,
+            createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+            read: !!m.read,
+            messageType: m.message_type as ChatMessage["messageType"],
+            dealAmount: m.deal_amount ?? undefined,
+          }));
+          setMessages(mapped as ChatMessage[]);
+        }
+      }
+
+      setLoading(false);
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  // Derived values for UI
   const chatName = state.name || store?.name || worker?.name || "Чат";
-  const items = state.items || existingChat?.items || [];
-  const expectedPrice = state.expectedPrice || existingChat?.expectedPrice || 0;
+  const items = state.items ?? [];
+  const expectedPrice =
+    state.expectedPrice ?? existingChat?.expected_price ?? 0;
   const serviceDescription =
-    state.serviceDescription || existingChat?.serviceDescription;
+    state.serviceDescription ?? existingChat?.service_description;
 
-  const [messages, setMessages] = useState<ChatMessage[]>(chatMessages);
   const [newMessage, setNewMessage] = useState("");
   const [showProductHeader, setShowProductHeader] = useState(true);
   const [chatStatus, setChatStatus] = useState<
@@ -76,11 +207,11 @@ const ChatDetail = () => {
     existingChat?.status === "agreed"
       ? "agreed"
       : id?.startsWith("new")
-      ? "initial"
-      : "negotiating"
+        ? "initial"
+        : "negotiating",
   );
   const [agreedPrice, setAgreedPrice] = useState<number | null>(
-    existingChat?.agreedPrice || null
+    existingChat?.agreed_price ?? null,
   );
   const [currentProposal, setCurrentProposal] = useState<{
     price: number;
@@ -98,120 +229,534 @@ const ChatDetail = () => {
     scrollToBottom();
   }, [messages, showDealConfirmed]);
 
-  const handleUserPriceProposal = (price: number) => {
+  const handleUserPriceProposal = async (price: number) => {
     setChatStatus("negotiating");
     setCurrentProposal({ price, from: "user" });
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "new-chat",
-      senderId: "user-1",
-      senderRole: "user",
-      content: `${price.toLocaleString()}₮ санал болгож байна`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "price_proposal",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
+    // New-chat: create DB chat and send proposal, then auto-accept
+    if (!id || id.startsWith("new-")) {
+      const chatInit = {
+        user_id: profile?.id ?? "",
+        store_id: state.storeId ?? store?.id ?? null,
+        worker_id: state.workerId ?? worker?.id ?? null,
+        type: state.storeId || store?.id ? "store" : "service",
+        status: "negotiating",
+        expected_price: price,
+        last_message: `${price?.toLocaleString()}₮ санал болгож байна`,
+      } as Partial<Database["public"]["Tables"]["chats"]["Insert"]>;
 
-    // Simulate store/worker response
-    setTimeout(() => {
-      const random = Math.random();
-      if (random > 0.6) {
-        // Accept
-        handleDealAccepted(price);
-      } else if (random > 0.3) {
-        // Counter offer
-        const counterPrice = Math.round(price * (1 + Math.random() * 0.1));
-        setCurrentProposal({
-          price: counterPrice,
-          from: store ? "store" : "worker",
-        });
+      const messageInit = {
+        sender_id: profile?.id ?? "",
+        sender_role: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        message_type: "price_proposal",
+        deal_amount: price,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-        const counterMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          chatId: id || "new-chat",
-          senderId: store?.id || worker?.id || "owner-1",
-          senderRole: store ? "store" : "worker",
-          content: `${counterPrice.toLocaleString()}₮ санал болгож байна`,
-          createdAt: new Date(),
-          read: true,
-          messageType: "price_proposal",
-          dealAmount: counterPrice,
+      const res = await createChatAndSend(chatInit, messageInit);
+      if (res?.message && res.chat) {
+        const m = res.message;
+        const mapped = {
+          id: m.id,
+          chatId: m.chat_id,
+          senderId: m.sender_id,
+          senderRole: m.sender_role,
+          content: m.content ?? "",
+          imageUrl: m.image_url ?? undefined,
+          createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+          read: !!m.read,
+          messageType: m.message_type as ChatMessage["messageType"],
+          dealAmount: m.deal_amount ?? undefined,
+        } as ChatMessage;
+        setExistingChat(res.chat);
+        setMessages((prev) => [...prev, mapped]);
+
+        // Auto-accept proposal on behalf of store/worker
+        const senderId = res.chat.store_id ?? res.chat.worker_id ?? "system";
+        const senderRole = res.chat.store_id
+          ? "store"
+          : res.chat.worker_id
+            ? "worker"
+            : "system";
+        const accPayload = {
+          chat_id: res.chat.id,
+          sender_id: senderId as string,
+          sender_role: senderRole,
+          content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+          message_type: "deal_accepted",
+          deal_amount: price,
+        } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+        const { data: acc } = (await (supabase as any)
+          .from("chat_messages")
+          .insert(accPayload)
+          .select()
+          .maybeSingle()) as {
+          data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+          error: unknown;
         };
-        setMessages((prev) => [...prev, counterMessage]);
-      } else {
-        // Continue negotiation
-        const response: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          chatId: id || "new-chat",
-          senderId: store?.id || worker?.id || "owner-1",
-          senderRole: store ? "store" : "worker",
-          content: "Үнийн саналыг хүлээн авлаа, хэлэлцье!",
-          createdAt: new Date(),
-          read: true,
-          messageType: "text",
-        };
-        setMessages((prev) => [...prev, response]);
+
+        if (acc) {
+          const mappedAcc = {
+            id: acc.id,
+            chatId: acc.chat_id,
+            senderId: acc.sender_id,
+            senderRole: acc.sender_role,
+            content: acc.content ?? "",
+            imageUrl: acc.image_url ?? undefined,
+            createdAt: acc.created_at ? new Date(acc.created_at) : new Date(),
+            read: !!acc.read,
+            messageType: acc.message_type as ChatMessage["messageType"],
+            dealAmount: acc.deal_amount ?? undefined,
+          } as ChatMessage;
+
+          // update chat row
+          await (supabase as any)
+            .from("chats")
+            .update({
+              status: "agreed",
+              agreed_price: price,
+              last_message: acc.content,
+            })
+            .eq("id", res.chat.id);
+
+          setMessages((prev) => [...prev, mappedAcc]);
+          setChatStatus("agreed");
+          setAgreedPrice(price);
+          setCurrentProposal(null);
+          setShowDealConfirmed(true);
+        }
       }
-    }, 1500);
+
+      return;
+    }
+
+    // DB-backed flow for existing chats
+    try {
+      const userPayload = {
+        chat_id: id,
+        sender_id: profile?.id ?? "",
+        sender_role: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        message_type: "price_proposal",
+        deal_amount: price,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data: userMsg } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(userPayload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (userMsg) {
+        const mapped = {
+          id: userMsg.id,
+          chatId: userMsg.chat_id,
+          senderId: userMsg.sender_id,
+          senderRole: userMsg.sender_role,
+          content: userMsg.content ?? "",
+          imageUrl: userMsg.image_url ?? undefined,
+          createdAt: userMsg.created_at
+            ? new Date(userMsg.created_at)
+            : new Date(),
+          read: !!userMsg.read,
+          messageType: userMsg.message_type as ChatMessage["messageType"],
+          dealAmount: userMsg.deal_amount ?? undefined,
+        } as ChatMessage;
+        setMessages((prev) => [...prev, mapped]);
+      }
+
+      // Auto-accept all proposals: insert a deal_accepted message from store/worker
+      const senderId =
+        existingChat?.store_id ?? existingChat?.worker_id ?? "system";
+      const senderRole = existingChat?.store_id
+        ? "store"
+        : existingChat?.worker_id
+          ? "worker"
+          : "system";
+      const acceptPayload = {
+        chat_id: id,
+        sender_id: senderId as string,
+        sender_role: senderRole,
+        content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+        message_type: "deal_accepted",
+        deal_amount: price,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data: accMsg } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(acceptPayload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (accMsg) {
+        const mapped = {
+          id: accMsg.id,
+          chatId: accMsg.chat_id,
+          senderId: accMsg.sender_id,
+          senderRole: accMsg.sender_role,
+          content: accMsg.content ?? "",
+          imageUrl: accMsg.image_url ?? undefined,
+          createdAt: accMsg.created_at
+            ? new Date(accMsg.created_at)
+            : new Date(),
+          read: !!accMsg.read,
+          messageType: accMsg.message_type as ChatMessage["messageType"],
+          dealAmount: accMsg.deal_amount ?? undefined,
+        } as ChatMessage;
+
+        // update chat row (status/agreed_price/last_message)
+        await (supabase as any)
+          .from("chats")
+          .update({
+            status: "agreed",
+            agreed_price: price,
+            last_message: mapped.content,
+          })
+          .eq("id", id);
+
+        setMessages((prev) => [...prev, mapped]);
+        setChatStatus("agreed");
+        setAgreedPrice(price);
+        setCurrentProposal(null);
+        setShowDealConfirmed(true);
+      }
+    } catch (err) {
+      // fallback: append locally
+      const message: ChatMessage = {
+        id: Date.now().toString(),
+        chatId: id || "new-chat",
+        senderId: profile?.id ?? "user-1",
+        senderRole: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        createdAt: new Date(),
+        read: false,
+        messageType: "price_proposal",
+        dealAmount: price,
+      };
+      setMessages((prev) => [...prev, message]);
+    }
   };
 
-  const handleAcceptProposal = (price: number) => {
-    handleDealAccepted(price);
+  const handleAcceptProposal = async (price: number) => {
+    await handleDealAccepted(price);
   };
 
-  const handleRejectProposal = () => {
+  const handleRejectProposal = async () => {
     setCurrentProposal(null);
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "new-chat",
-      senderId: "user-1",
-      senderRole: "user",
-      content: "Өөр үнэ санал болгоно уу",
-      createdAt: new Date(),
-      read: false,
-      messageType: "text",
-    };
-    setMessages((prev) => [...prev, message]);
-  };
 
-  const handleCounterProposal = (price: number) => {
-    setCurrentProposal({ price, from: "user" });
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "new-chat",
-      senderId: "user-1",
-      senderRole: "user",
-      content: `${price.toLocaleString()}₮ санал болгож байна`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "price_proposal",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
+    if (!id || id.startsWith("new-")) {
+      const chatInit = {
+        user_id: profile?.id ?? "",
+        store_id: state.storeId ?? store?.id ?? null,
+        worker_id: state.workerId ?? worker?.id ?? null,
+        type: state.storeId || store?.id ? "store" : "service",
+        status: "negotiating",
+        last_message: "Өөр үнэ санал болгоно уу",
+      } as Partial<Database["public"]["Tables"]["chats"]["Insert"]>;
 
-    // Simulate response
-    setTimeout(() => {
-      if (Math.random() > 0.4) {
-        handleDealAccepted(price);
+      const messageInit = {
+        sender_id: profile?.id ?? "",
+        sender_role: "user",
+        content: "Өөр үнэ санал болгоно уу",
+        message_type: "text",
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const res = await createChatAndSend(chatInit, messageInit);
+      if (res?.message && res.chat) {
+        const m = res.message;
+        const mapped = {
+          id: m.id,
+          chatId: m.chat_id,
+          senderId: m.sender_id,
+          senderRole: m.sender_role,
+          content: m.content ?? "",
+          imageUrl: m.image_url ?? undefined,
+          createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+          read: !!m.read,
+          messageType: m.message_type as ChatMessage["messageType"],
+          dealAmount: m.deal_amount ?? undefined,
+        } as ChatMessage;
+        setExistingChat(res.chat);
+        setMessages((prev) => [...prev, mapped]);
       }
-    }, 1500);
+
+      return;
+    }
+
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? "",
+        sender_role: "user",
+        content: "Өөр үнэ санал болгоно уу",
+        message_type: "text",
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data: inserted } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(payload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (inserted) {
+        const mapped = {
+          id: inserted.id,
+          chatId: inserted.chat_id,
+          senderId: inserted.sender_id,
+          senderRole: inserted.sender_role,
+          content: inserted.content ?? "",
+          imageUrl: inserted.image_url ?? undefined,
+          createdAt: inserted.created_at
+            ? new Date(inserted.created_at)
+            : new Date(),
+          read: !!inserted.read,
+          messageType: inserted.message_type as ChatMessage["messageType"],
+          dealAmount: inserted.deal_amount ?? undefined,
+        } as ChatMessage;
+        setMessages((prev) => [...prev, mapped]);
+      }
+    } catch (err) {
+      const message: ChatMessage = {
+        id: Date.now().toString(),
+        chatId: id || "new-chat",
+        senderId: profile?.id ?? "user-1",
+        senderRole: "user",
+        content: "Өөр үнэ санал болгоно уу",
+        createdAt: new Date(),
+        read: false,
+        messageType: "text",
+      };
+      setMessages((prev) => [...prev, message]);
+    }
   };
 
-  const handleDealAccepted = (price: number) => {
+  const handleCounterProposal = async (price: number) => {
+    setCurrentProposal({ price, from: "user" });
+
+    if (!id || id.startsWith("new-")) {
+      const message: ChatMessage = {
+        id: Date.now().toString(),
+        chatId: id || "new-chat",
+        senderId: profile?.id ?? "user-1",
+        senderRole: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        createdAt: new Date(),
+        read: false,
+        messageType: "price_proposal",
+        dealAmount: price,
+      };
+      setMessages((prev) => [...prev, message]);
+      return;
+    }
+
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? "",
+        sender_role: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        message_type: "price_proposal",
+        deal_amount: price,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data: inserted } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(payload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (inserted) {
+        const mapped = {
+          id: inserted.id,
+          chatId: inserted.chat_id,
+          senderId: inserted.sender_id,
+          senderRole: inserted.sender_role,
+          content: inserted.content ?? "",
+          imageUrl: inserted.image_url ?? undefined,
+          createdAt: inserted.created_at
+            ? new Date(inserted.created_at)
+            : new Date(),
+          read: !!inserted.read,
+          messageType: inserted.message_type as ChatMessage["messageType"],
+          dealAmount: inserted.deal_amount ?? undefined,
+        } as ChatMessage;
+        setMessages((prev) => [...prev, mapped]);
+      }
+
+      // Auto accept the counter-proposal as well
+      const senderId =
+        existingChat?.store_id ?? existingChat?.worker_id ?? "system";
+      const senderRole = existingChat?.store_id
+        ? "store"
+        : existingChat?.worker_id
+          ? "worker"
+          : "system";
+      const acceptPayload = {
+        chat_id: id,
+        sender_id: senderId as string,
+        sender_role: senderRole,
+        content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+        message_type: "deal_accepted",
+        deal_amount: price,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data: acc } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(acceptPayload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (acc) {
+        await (supabase as any)
+          .from("chats")
+          .update({
+            status: "agreed",
+            agreed_price: price,
+            last_message: acc.content,
+          })
+          .eq("id", id);
+
+        const mapped = {
+          id: acc.id,
+          chatId: acc.chat_id,
+          senderId: acc.sender_id,
+          senderRole: acc.sender_role,
+          content: acc.content ?? "",
+          imageUrl: acc.image_url ?? undefined,
+          createdAt: acc.created_at ? new Date(acc.created_at) : new Date(),
+          read: !!acc.read,
+          messageType: acc.message_type as ChatMessage["messageType"],
+          dealAmount: acc.deal_amount ?? undefined,
+        } as ChatMessage;
+
+        setMessages((prev) => [...prev, mapped]);
+        setChatStatus("agreed");
+        setAgreedPrice(price);
+        setCurrentProposal(null);
+        setShowDealConfirmed(true);
+      }
+    } catch (err) {
+      const message: ChatMessage = {
+        id: Date.now().toString(),
+        chatId: id || "new-chat",
+        senderId: profile?.id ?? "user-1",
+        senderRole: "user",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        createdAt: new Date(),
+        read: false,
+        messageType: "price_proposal",
+        dealAmount: price,
+      };
+      setMessages((prev) => [...prev, message]);
+    }
+  };
+
+  const handleDealAccepted = async (price: number) => {
     setAgreedPrice(price);
     setChatStatus("agreed");
     setCurrentProposal(null);
     setShowDealConfirmed(true);
 
+    // DB-backed acceptance when chat exists
+    if (id && !id.startsWith("new-")) {
+      try {
+        const senderId =
+          existingChat?.store_id ??
+          existingChat?.worker_id ??
+          profile?.id ??
+          "";
+        const senderRole = existingChat?.store_id
+          ? "store"
+          : existingChat?.worker_id
+            ? "worker"
+            : "system";
+        const payload = {
+          chat_id: id,
+          sender_id: senderId as string,
+          sender_role: senderRole,
+          content: `${price?.toLocaleString()}₮-р тохиролцлоо ✓`,
+          message_type: "deal_accepted",
+          deal_amount: price,
+        } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+        const { data: inserted } = (await (supabase as any)
+          .from("chat_messages")
+          .insert(payload)
+          .select()
+          .maybeSingle()) as {
+          data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+          error: unknown;
+        };
+
+        if (inserted) {
+          const mapped = {
+            id: inserted.id,
+            chatId: inserted.chat_id,
+            senderId: inserted.sender_id,
+            senderRole: inserted.sender_role,
+            content: inserted.content ?? "",
+            imageUrl: inserted.image_url ?? undefined,
+            createdAt: inserted.created_at
+              ? new Date(inserted.created_at)
+              : new Date(),
+            read: !!inserted.read,
+            messageType: inserted.message_type as ChatMessage["messageType"],
+            dealAmount: inserted.deal_amount ?? undefined,
+          } as ChatMessage;
+
+          setMessages((prev) => [...prev, mapped]);
+
+          await (supabase as any)
+            .from("chats")
+            .update({
+              status: "agreed",
+              agreed_price: price,
+              last_message: mapped.content,
+            })
+            .eq("id", id);
+        }
+      } catch (err) {
+        // fallback: local append
+        const message: ChatMessage = {
+          id: Date.now().toString(),
+          chatId: id || "new-chat",
+          senderId: profile?.id ?? "user-1",
+          senderRole: "user",
+          content: `${price?.toLocaleString()}₮-р тохиролцлоо ✓`,
+          createdAt: new Date(),
+          read: true,
+          messageType: "deal_accepted",
+          dealAmount: price,
+        };
+        setMessages((prev) => [...prev, message]);
+      }
+
+      return;
+    }
+
+    // local-preview flow for new chats
     const message: ChatMessage = {
       id: Date.now().toString(),
       chatId: id || "new-chat",
       senderId: store?.id || worker?.id || "owner-1",
       senderRole: store ? "store" : "worker",
-      content: `${price.toLocaleString()}₮-р тохиролцлоо ✓`,
+      content: `${price?.toLocaleString()}₮-р тохиролцлоо ✓`,
       createdAt: new Date(),
       read: true,
       messageType: "deal_accepted",
@@ -220,58 +765,278 @@ const ChatDetail = () => {
     setMessages((prev) => [...prev, message]);
   };
 
-  const handleSend = () => {
-    if (!newMessage.trim()) return;
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "new-chat",
-      senderId: "user-1",
-      senderRole: "user",
-      content: newMessage.trim(),
-      createdAt: new Date(),
-      read: false,
-      messageType: "text",
-    };
-
-    setMessages((prev) => [...prev, message]);
-    setNewMessage("");
-
-    // Simulate response
-    setTimeout(() => {
-      const response: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        chatId: id || "new-chat",
-        senderId: store?.id || worker?.id || "owner-1",
-        senderRole: store ? "store" : "worker",
-        content: getAutoResponse(newMessage),
-        createdAt: new Date(),
-        read: true,
-        messageType: "text",
-      };
-      setMessages((prev) => [...prev, response]);
-    }, 1000);
+  const uploadToStorage = async (file: File, folder: string) => {
+    const path = `${folder}/${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage
+      .from("chat-media")
+      .upload(path, file, { upsert: true });
+    if (error) throw error;
+    const urlRes = supabase.storage.from("chat-media").getPublicUrl(path);
+    return urlRes.data?.publicUrl ?? null;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+  // Create a new chat row and send the first message. Navigates to the created chat and returns created message+chat.
+  const createChatAndSend = async (
+    chatInit: Partial<Database["public"]["Tables"]["chats"]["Insert"]>,
+    messageInit: Database["public"]["Tables"]["chat_messages"]["Insert"],
+  ) => {
+    try {
+      const { data: chatRow } = (await (supabase as any)
+        .from("chats")
+        .insert(chatInit)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chats"]["Row"] | null;
+        error: unknown;
+      };
+
+      if (!chatRow) throw new Error("Failed to create chat");
+
+      // insert first message
+      const payload = {
+        ...messageInit,
+        chat_id: chatRow.id,
+      } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+      const { data: msg } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(payload)
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: unknown;
+      };
+
+      // update chat last_message
+      try {
+        await (supabase as any)
+          .from("chats")
+          .update({ last_message: msg?.content ?? messageInit.content })
+          .eq("id", chatRow.id);
+      } catch (e) {
+        /* ignore */
+      }
+
+      // navigate to created chat
+      navigate(`/chat/${chatRow.id}`, { replace: true, state: { ...state } });
+
+      // return both for local state update if needed
+      return { chat: chatRow, message: msg };
+    } catch (e) {
+      console.error("createChatAndSend failed", e);
+      return null;
+    }
+  };
+
+  const handleSend = async () => {
+    if (!newMessage.trim()) return;
+
+    // If this is an existing DB chat, insert message into DB.
+    if (id && !id.startsWith("new-")) {
+      try {
+        const payload = {
+          chat_id: id,
+          sender_id: profile?.id ?? "",
+          sender_role: "user",
+          content: newMessage.trim(),
+          message_type: "text",
+        } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+        const { data: inserted } = (await (supabase as any)
+          .from("chat_messages")
+          .insert(payload)
+          .select()
+          .maybeSingle()) as {
+          data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+          error: unknown;
+        };
+
+        if (inserted) {
+          const mapped = {
+            id: inserted.id,
+            chatId: inserted.chat_id,
+            senderId: inserted.sender_id,
+            senderRole: inserted.sender_role,
+            content: inserted.content ?? "",
+            imageUrl: inserted.image_url ?? undefined,
+            createdAt: inserted.created_at
+              ? new Date(inserted.created_at)
+              : new Date(),
+            read: !!inserted.read,
+            messageType: inserted.message_type as ChatMessage["messageType"],
+            dealAmount: inserted.deal_amount ?? undefined,
+          } as ChatMessage;
+
+          setMessages((prev) => [...prev, mapped]);
+          setNewMessage("");
+
+          // update chat's last_message quickly
+          await (supabase as any)
+            .from("chats")
+            .update({ last_message: mapped.content })
+            .eq("id", id);
+        }
+      } catch (e) {
+        // fall back to local append
         const message: ChatMessage = {
           id: Date.now().toString(),
           chatId: id || "new-chat",
-          senderId: "user-1",
+          senderId: profile?.id ?? "user-1",
           senderRole: "user",
-          content: "Зураг илгээлээ",
-          imageUrl: reader.result as string,
+          content: newMessage.trim(),
           createdAt: new Date(),
           read: false,
-          messageType: "image",
+          messageType: "text",
         };
         setMessages((prev) => [...prev, message]);
-      };
-      reader.readAsDataURL(file);
+        setNewMessage("");
+      }
+
+      return;
+    }
+
+    // Create new DB chat and send text message
+    const chatInit = {
+      user_id: profile?.id ?? "",
+      store_id: state.storeId ?? store?.id ?? null,
+      worker_id: state.workerId ?? worker?.id ?? null,
+      type: state.storeId || store?.id ? "store" : "service",
+      status: "negotiating",
+      last_message: newMessage.trim(),
+    } as Partial<Database["public"]["Tables"]["chats"]["Insert"]>;
+
+    const messageInit = {
+      sender_id: profile?.id ?? "",
+      sender_role: "user",
+      content: newMessage.trim(),
+      message_type: "text",
+    } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+    const res = await createChatAndSend(chatInit, messageInit);
+    if (res?.message && res.chat) {
+      const m = res.message;
+      const mapped = {
+        id: m.id,
+        chatId: m.chat_id,
+        senderId: m.sender_id,
+        senderRole: m.sender_role,
+        content: m.content ?? "",
+        imageUrl: m.image_url ?? undefined,
+        createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+        read: !!m.read,
+        messageType: m.message_type as ChatMessage["messageType"],
+        dealAmount: m.deal_amount ?? undefined,
+      } as ChatMessage;
+      setExistingChat(res.chat);
+      setMessages((prev) => [...prev, mapped]);
+    }
+    setNewMessage("");
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (id && !id.startsWith("new-")) {
+      try {
+        const url = await uploadToStorage(file, "user-chat");
+        if (!url) return;
+
+        const payload = {
+          chat_id: id,
+          sender_id: profile?.id ?? "",
+          sender_role: "user",
+          content: "Зураг илгээлээ",
+          image_url: url,
+          message_type: "image",
+        } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+        const { data: inserted } = (await (supabase as any)
+          .from("chat_messages")
+          .insert(payload)
+          .select()
+          .maybeSingle()) as {
+          data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+          error: unknown;
+        };
+
+        if (inserted) {
+          const mapped = {
+            id: inserted.id,
+            chatId: inserted.chat_id,
+            senderId: inserted.sender_id,
+            senderRole: inserted.sender_role,
+            content: inserted.content ?? "",
+            imageUrl: inserted.image_url ?? undefined,
+            createdAt: inserted.created_at
+              ? new Date(inserted.created_at)
+              : new Date(),
+            read: !!inserted.read,
+            messageType: inserted.message_type as ChatMessage["messageType"],
+            dealAmount: inserted.deal_amount ?? undefined,
+          } as ChatMessage;
+          setMessages((prev) => [...prev, mapped]);
+        }
+      } catch (err) {
+        // fallback to client preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const message: ChatMessage = {
+            id: Date.now().toString(),
+            chatId: id || "new-chat",
+            senderId: profile?.id ?? "user-1",
+            senderRole: "user",
+            content: "Зураг илгээлээ",
+            imageUrl: reader.result as string,
+            createdAt: new Date(),
+            read: false,
+            messageType: "image",
+          };
+          setMessages((prev) => [...prev, message]);
+        };
+        reader.readAsDataURL(file);
+      }
+
+      return;
+    }
+
+    // fallback: create chat in DB then send image message (after upload)
+    const url = await uploadToStorage(file, "user-chat");
+    if (!url) return;
+
+    const chatInit = {
+      user_id: profile?.id ?? "",
+      store_id: state.storeId ?? store?.id ?? null,
+      worker_id: state.workerId ?? worker?.id ?? null,
+      type: state.storeId || store?.id ? "store" : "service",
+      status: "negotiating",
+      last_message: "Зураг илгээлээ",
+    } as Partial<Database["public"]["Tables"]["chats"]["Insert"]>;
+
+    const messageInit = {
+      sender_id: profile?.id ?? "",
+      sender_role: "user",
+      content: "Зураг илгээлээ",
+      image_url: url,
+      message_type: "image",
+    } as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+    const res = await createChatAndSend(chatInit, messageInit);
+    if (res?.message && res.chat) {
+      const m = res.message;
+      const mapped = {
+        id: m.id,
+        chatId: m.chat_id,
+        senderId: m.sender_id,
+        senderRole: m.sender_role,
+        content: m.content ?? "",
+        imageUrl: m.image_url ?? undefined,
+        createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+        read: !!m.read,
+        messageType: m.message_type as ChatMessage["messageType"],
+        dealAmount: m.deal_amount ?? undefined,
+      } as ChatMessage;
+      setExistingChat(res.chat);
+      setMessages((prev) => [...prev, mapped]);
     }
   };
 
@@ -296,8 +1061,7 @@ const ChatDetail = () => {
     });
   };
 
-  const isMyMessage = (senderId: string) => senderId === "user-1";
-
+  const isMyMessage = (senderId: string) => senderId === profile?.id;
   const renderMessage = (message: ChatMessage) => {
     const isMine = isMyMessage(message.senderId);
 
@@ -345,8 +1109,8 @@ const ChatDetail = () => {
                 ? "bg-primary/20 border-2 border-primary rounded-br-md"
                 : "bg-primary text-primary-foreground rounded-br-md"
               : message.messageType === "price_proposal"
-              ? "bg-card border-2 border-primary rounded-bl-md"
-              : "bg-card border border-border rounded-bl-md"
+                ? "bg-card border-2 border-primary rounded-bl-md"
+                : "bg-card border border-border rounded-bl-md"
           }`}>
           {message.imageUrl && (
             <img
@@ -378,7 +1142,7 @@ const ChatDetail = () => {
 
   return (
     <AppLayout hideNav>
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full lg:my-6 lg:rounded-2xl lg:border lg:border-border lg:overflow-hidden lg:shadow-lg bg-background">
+      <div className="flex-1 flex h-5/6 flex-col max-w-4xl mx-auto w-full lg:my-6 lg:rounded-2xl lg:border lg:border-border lg:overflow-hidden lg:shadow-lg bg-background">
         {/* Header */}
         <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 safe-area-top">
           <button
@@ -397,8 +1161,8 @@ const ChatDetail = () => {
               {chatStatus === "agreed"
                 ? "Тохиролцсон ✓"
                 : chatStatus === "negotiating"
-                ? "Үнэ тохиролцож байна..."
-                : "Чат эхэллээ"}
+                  ? "Үнэ тохиролцож байна..."
+                  : "Чат эхэллээ"}
             </p>
           </div>
           <button className="w-10 h-10 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors">
@@ -429,8 +1193,8 @@ const ChatDetail = () => {
                   variant={chatStatus === "agreed" ? "default" : "secondary"}
                   className={chatStatus === "agreed" ? "bg-green-500" : ""}>
                   {agreedPrice
-                    ? `${agreedPrice.toLocaleString()}₮`
-                    : `~${expectedPrice.toLocaleString()}₮`}
+                    ? `${agreedPrice?.toLocaleString()}₮`
+                    : `~${expectedPrice?.toLocaleString()}₮`}
                 </Badge>
                 {showProductHeader ? (
                   <ChevronUp className="w-4 h-4" />
@@ -463,7 +1227,7 @@ const ChatDetail = () => {
                           {item.productName}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {item.quantity} x {item.price.toLocaleString()}₮
+                          {item.quantity} x {item.price?.toLocaleString()}₮
                         </p>
                       </div>
                     </div>
@@ -530,7 +1294,7 @@ const ChatDetail = () => {
               <DealConfirmedCard
                 agreedPrice={agreedPrice}
                 storeName={store?.name || worker?.name}
-                orderId={mockOrders[0]?.id}
+                orderId={order?.id}
                 showContinueShopping={true}
                 onContinueShopping={() => navigate("/stores")}
               />
@@ -541,9 +1305,10 @@ const ChatDetail = () => {
         </div>
 
         {/* Price Input for User - Initial or during negotiation when no active proposal from other side */}
-        {(chatStatus === "initial" ||
-          (chatStatus === "negotiating" &&
-            (!currentProposal || currentProposal.from === "user"))) &&
+        {messages?.length === 0 &&
+          (chatStatus === "initial" ||
+            (chatStatus === "negotiating" &&
+              (!currentProposal || currentProposal.from === "user"))) &&
           expectedPrice > 0 &&
           !showDealConfirmed && (
             <div className="p-4 border-t border-border bg-card">

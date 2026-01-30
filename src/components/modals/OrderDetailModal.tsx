@@ -1,33 +1,33 @@
-import { useState } from 'react';
-import { 
-  MapPin, 
-  Phone, 
-  MessageCircle, 
-  Truck, 
+import { useState } from "react";
+import {
+  MapPin,
+  Phone,
+  MessageCircle,
+  Truck,
   User,
   Clock,
   CheckCircle,
   XCircle,
-  Package
-} from 'lucide-react';
+  Package,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import { OrderStatus } from '@/types';
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { OrderStatus } from "@/types";
 
 interface OrderItem {
   name: string;
@@ -38,16 +38,19 @@ interface OrderItem {
 interface OwnerOrder {
   id: string;
   customer: {
-    name: string;
-    avatar: string;
-    phone: string;
+    id?: string | null;
+    name?: string | null;
+    avatar?: string | null;
+    phone?: string | null;
   };
   items: OrderItem[];
   status: OrderStatus;
-  totalAmount: number;
-  deliveryAddress: string;
-  createdAt: Date;
-  driver?: { name: string; phone: string };
+  totalAmount: number | null;
+  deliveryAddress: string | null;
+  createdAt: string | null;
+  driver?:
+    | { id?: string | null; name?: string | null; phone?: string | null }
+    | undefined;
 }
 
 interface OrderDetailModalProps {
@@ -55,33 +58,30 @@ interface OrderDetailModalProps {
   onOpenChange: (open: boolean) => void;
   order: OwnerOrder | null;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
-  onAssignDriver: (orderId: string) => void;
 }
 
-const statusConfig: Record<OrderStatus, { label: string; color: string; icon: typeof Clock }> = {
-  negotiating: { label: 'Тохиролцож байна', color: 'bg-warning', icon: MessageCircle },
-  pending: { label: 'Хүлээгдэж байна', color: 'bg-warning', icon: Clock },
-  confirmed: { label: 'Баталгаажсан', color: 'bg-primary', icon: CheckCircle },
-  in_progress: { label: 'Хүргэж байна', color: 'bg-success', icon: Truck },
-  completed: { label: 'Дууссан', color: 'bg-muted', icon: CheckCircle },
-  cancelled: { label: 'Цуцлагдсан', color: 'bg-destructive', icon: XCircle },
+const statusConfig: Record<
+  OrderStatus,
+  { label: string; color: string; icon: typeof Clock }
+> = {
+  negotiating: {
+    label: "Тохиролцож байна",
+    color: "bg-warning",
+    icon: MessageCircle,
+  },
+  pending: { label: "Хүлээгдэж байна", color: "bg-warning", icon: Clock },
+  confirmed: { label: "Баталгаажсан", color: "bg-primary", icon: CheckCircle },
+  in_progress: { label: "Хүргэж байна", color: "bg-success", icon: Truck },
+  completed: { label: "Дууссан", color: "bg-muted", icon: CheckCircle },
+  cancelled: { label: "Цуцлагдсан", color: "bg-destructive", icon: XCircle },
 };
 
-const mockDrivers = [
-  { id: '1', name: 'Болд Ж.', phone: '88001122' },
-  { id: '2', name: 'Ганзориг Д.', phone: '88002233' },
-  { id: '3', name: 'Баттөр Н.', phone: '88003344' },
-];
-
-export function OrderDetailModal({ 
-  open, 
-  onOpenChange, 
-  order, 
+export function OrderDetailModal({
+  open,
+  onOpenChange,
+  order,
   onUpdateStatus,
-  onAssignDriver 
 }: OrderDetailModalProps) {
-  const [selectedDriver, setSelectedDriver] = useState<string>('');
-
   if (!order) return null;
 
   const status = statusConfig[order.status];
@@ -126,8 +126,12 @@ export function OrderDetailModal({
                 className="w-12 h-12 rounded-full object-cover"
               />
               <div className="flex-1">
-                <p className="font-medium text-foreground">{order.customer.name}</p>
-                <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                <p className="font-medium text-foreground">
+                  {order.customer.name}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {order.customer.phone}
+                </p>
               </div>
               <Button size="icon" variant="outline">
                 <Phone className="w-4 h-4" />
@@ -153,55 +157,28 @@ export function OrderDetailModal({
             <h4 className="font-medium text-foreground">Захиалсан бараа</h4>
             <div className="bg-muted rounded-xl p-3 space-y-2">
               {order.items.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground">{item.name} x{item.quantity}</span>
-                  <span className="text-muted-foreground">₮{(item.price * item.quantity).toLocaleString()}</span>
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-sm">
+                  <span className="text-foreground">
+                    {item.name} x{item.quantity}
+                  </span>
+                  <span className="text-muted-foreground">
+                    ₮{(item.price * item.quantity)?.toLocaleString()}
+                  </span>
                 </div>
               ))}
               <Separator />
               <div className="flex items-center justify-between font-medium">
                 <span className="text-foreground">Нийт дүн</span>
-                <span className="text-primary">₮{order.totalAmount.toLocaleString()}</span>
+                <span className="text-primary">
+                  ₮{order.totalAmount?.toLocaleString()}
+                </span>
               </div>
             </div>
           </div>
 
           <Separator />
-
-          {/* Driver Assignment */}
-          {order.status === 'confirmed' && !order.driver && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-foreground flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Жолооч оноох
-              </h4>
-              <div className="flex gap-2">
-                <Select value={selectedDriver} onValueChange={setSelectedDriver}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Жолооч сонгох" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockDrivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.name} • {driver.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button 
-                  onClick={() => {
-                    if (selectedDriver) {
-                      onAssignDriver(order.id);
-                      onOpenChange(false);
-                    }
-                  }}
-                  disabled={!selectedDriver}
-                >
-                  Оноох
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* Driver Info */}
           {order.driver && (
@@ -212,8 +189,12 @@ export function OrderDetailModal({
               </h4>
               <div className="flex items-center justify-between p-3 bg-success/10 rounded-xl">
                 <div>
-                  <p className="font-medium text-foreground">{order.driver.name}</p>
-                  <p className="text-sm text-muted-foreground">{order.driver.phone}</p>
+                  <p className="font-medium text-foreground">
+                    {order.driver.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {order.driver.phone}
+                  </p>
                 </div>
                 <Button size="icon" variant="outline">
                   <Phone className="w-4 h-4" />
@@ -228,26 +209,35 @@ export function OrderDetailModal({
           <div className="space-y-2">
             <h4 className="font-medium text-foreground">Үйлдэл</h4>
             <div className="grid grid-cols-2 gap-2">
-              {order.status === 'negotiating' && (
+              {order.status === "negotiating" && (
                 <>
-                  <Button onClick={() => handleStatusChange('confirmed')} className="w-full">
+                  <Button
+                    onClick={() => handleStatusChange("confirmed")}
+                    className="w-full">
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Батлах
                   </Button>
-                  <Button variant="destructive" onClick={() => handleStatusChange('cancelled')} className="w-full">
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleStatusChange("cancelled")}
+                    className="w-full">
                     <XCircle className="w-4 h-4 mr-2" />
                     Цуцлах
                   </Button>
                 </>
               )}
-              {order.status === 'confirmed' && order.driver && (
-                <Button onClick={() => handleStatusChange('in_progress')} className="w-full col-span-2">
+              {order.status === "confirmed" && order.driver && (
+                <Button
+                  onClick={() => handleStatusChange("in_progress")}
+                  className="w-full col-span-2">
                   <Truck className="w-4 h-4 mr-2" />
                   Хүргэлт эхлүүлэх
                 </Button>
               )}
-              {order.status === 'in_progress' && (
-                <Button onClick={() => handleStatusChange('completed')} className="w-full col-span-2">
+              {order.status === "in_progress" && (
+                <Button
+                  onClick={() => handleStatusChange("completed")}
+                  className="w-full col-span-2">
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Дуусгах
                 </Button>

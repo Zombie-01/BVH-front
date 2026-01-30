@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -15,8 +15,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { mockStores, mockProducts } from "@/data/mockData";
-import { OrderItem } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import type { Store, Product, OrderItem } from "@/types";
 
 interface CartItem {
   productId: string;
@@ -27,11 +28,71 @@ const StoreDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [store, setStore] = useState<Store | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const store = mockStores.find((s) => s.id === id);
-  const products = mockProducts.filter((p) => p.storeId === id);
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!id) return;
+      setLoading(true);
+      const { data: storeRows } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", id)
+        .limit(1);
+      const storeRow = (storeRows && storeRows[0]) as
+        | Database["public"]["Tables"]["stores"]["Row"]
+        | undefined;
+      if (storeRow && mounted) {
+        setStore({
+          id: storeRow.id,
+          name: storeRow.name,
+          description: storeRow.description ?? "",
+          image: storeRow?.image ?? "",
+          rating: storeRow.rating ?? 0,
+          reviewCount: storeRow.review_count ?? 0,
+          category: (storeRow.categories && storeRow.categories[0]) || "other",
+          location: storeRow.location ?? "",
+          isOpen: storeRow.is_open,
+          phone: storeRow.phone ?? undefined,
+        });
+      }
 
-  if (!store) {
+      const { data: prodRows } = await supabase
+        .from("products")
+        .select("*")
+        .eq("store_id", id)
+        .order("created_at", { ascending: true });
+      const rows = (prodRows ??
+        []) as Database["public"]["Tables"]["products"]["Row"][];
+      const mapped: Product[] = rows.map((r) => ({
+        id: r.id,
+        storeId: r.store_id,
+        name: r.name,
+        description: r.description ?? "",
+        price: r.price,
+        unit: r.unit ?? "",
+        image: r.image ?? "",
+        category: r.category ?? "",
+        inStock: r.in_stock,
+        specifications: Array.isArray(r.specifications)
+          ? (r.specifications as unknown as Product["specifications"])
+          : undefined,
+      }));
+      if (mounted) {
+        setProducts(mapped);
+      }
+      setLoading(false);
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  if (!store && !loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Дэлгүүр олдсонгүй</p>
@@ -46,7 +107,7 @@ const StoreDetail = () => {
         return prev.map((item) =>
           item.productId === productId
             ? { ...item, quantity: item.quantity + 1 }
-            : item
+            : item,
         );
       }
       return [...prev, { productId, quantity: 1 }];
@@ -60,7 +121,7 @@ const StoreDetail = () => {
         return prev.map((item) =>
           item.productId === productId
             ? { ...item, quantity: item.quantity - 1 }
-            : item
+            : item,
         );
       }
       return prev.filter((item) => item.productId !== productId);
@@ -92,11 +153,11 @@ const StoreDetail = () => {
       });
 
       // Navigate to chat with products
-      navigate(`/chat/new-${store.id}`, {
+      navigate(`/chat/new-${store?.id}`, {
         state: {
           type: "store",
-          name: store.name,
-          storeId: store.id,
+          name: store?.name,
+          storeId: store?.id,
           items: orderItems,
           expectedPrice: totalAmount,
         },
@@ -118,8 +179,8 @@ const StoreDetail = () => {
             {/* Header Image */}
             <div className="relative h-56 md:h-72 lg:h-80 lg:rounded-2xl lg:overflow-hidden lg:mt-6 lg:mx-6">
               <img
-                src={store.image}
-                alt={store.name}
+                src={store?.image}
+                alt={store?.name}
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -134,11 +195,11 @@ const StoreDetail = () => {
               {/* Chat Button */}
               <button
                 onClick={() =>
-                  navigate(`/chat/new-${store.id}`, {
+                  navigate(`/chat/new-${store?.id}`, {
                     state: {
                       type: "store",
-                      name: store.name,
-                      storeId: store.id,
+                      name: store?.name,
+                      storeId: store?.id,
                       items: [],
                       expectedPrice: 0,
                     },
@@ -158,28 +219,28 @@ const StoreDetail = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h1 className="text-xl md:text-2xl font-bold text-foreground">
-                      {store.name}
+                      {store?.name}
                     </h1>
                     <p className="text-muted-foreground text-sm md:text-base mt-1">
-                      {store.description}
+                      {store?.description}
                     </p>
                   </div>
-                  <Badge variant={store.isOpen ? "default" : "secondary"}>
-                    {store.isOpen ? "Нээлттэй" : "Хаалттай"}
+                  <Badge variant={store?.isOpen ? "default" : "secondary"}>
+                    {store?.isOpen ? "Нээлттэй" : "Хаалттай"}
                   </Badge>
                 </div>
 
                 <div className="flex items-center gap-4 mt-4">
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                    <span className="font-semibold">{store.rating}</span>
+                    <span className="font-semibold">{store?.rating}</span>
                     <span className="text-muted-foreground text-sm">
-                      ({store.reviewCount})
+                      ({store?.reviewCount})
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <MapPin className="w-4 h-4" />
-                    <span className="text-sm">{store.location}</span>
+                    <span className="text-sm">{store?.location}</span>
                   </div>
                 </div>
 
@@ -193,11 +254,11 @@ const StoreDetail = () => {
                     size="sm"
                     className="flex-1"
                     onClick={() =>
-                      navigate(`/chat/new-${store.id}`, {
+                      navigate(`/chat/new-${store?.id}`, {
                         state: {
                           type: "store",
-                          name: store.name,
-                          storeId: store.id,
+                          name: store?.name,
+                          storeId: store?.id,
                           items: [],
                           expectedPrice: 0,
                         },
@@ -258,7 +319,7 @@ const StoreDetail = () => {
                           <div className="flex items-center justify-between mt-2">
                             <div>
                               <span className="font-bold text-primary">
-                                {product.price.toLocaleString()}₮
+                                {product.price?.toLocaleString()}₮
                               </span>
                               <span className="text-xs text-muted-foreground ml-1">
                                 /{product.unit}
@@ -318,7 +379,7 @@ const StoreDetail = () => {
                     <div className="space-y-3 max-h-64 overflow-y-auto mb-4">
                       {cart.map((item) => {
                         const product = products.find(
-                          (p) => p.id === item.productId
+                          (p) => p.id === item.productId,
                         );
                         if (!product) return null;
                         return (
@@ -336,7 +397,7 @@ const StoreDetail = () => {
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {item.quantity} x{" "}
-                                {product.price.toLocaleString()}₮
+                                {product.price?.toLocaleString()}₮
                               </p>
                             </div>
                           </div>
@@ -349,7 +410,7 @@ const StoreDetail = () => {
                           {totalItems} бараа
                         </span>
                         <span className="font-bold text-xl text-primary">
-                          {totalAmount.toLocaleString()}₮
+                          {totalAmount?.toLocaleString()}₮
                         </span>
                       </div>
                       <Button
@@ -379,7 +440,7 @@ const StoreDetail = () => {
               <span className="text-muted-foreground">{totalItems} бараа</span>
             </div>
             <span className="font-bold text-lg">
-              {totalAmount.toLocaleString()}₮
+              {totalAmount?.toLocaleString()}₮
             </span>
           </div>
           <Button className="w-full" size="lg" onClick={handleCheckout}>

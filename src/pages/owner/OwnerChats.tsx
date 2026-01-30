@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import {
   MessageCircle,
   Search,
@@ -22,83 +25,94 @@ interface ChatPreview {
   };
   lastMessage: string;
   unread: number;
-  status: "negotiating" | "agreed" | "completed";
+  status: "negotiating" | "agreed" | "cancelled";
   items?: string[];
   expectedPrice?: number;
   updatedAt: Date;
 }
 
-const mockChats: ChatPreview[] = [
-  {
-    id: "1",
-    customer: {
-      name: "Батболд Д.",
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
-    },
-    lastMessage: "Энэ барааны үнийг бага зэрэг хямдруулах боломжтой юу?",
-    unread: 3,
-    status: "negotiating",
-    items: ["Цемент ПЦ-400 x10", "Элс x2"],
-    expectedPrice: 355000,
-    updatedAt: new Date("2024-01-17T10:30:00"),
-  },
-  {
-    id: "2",
-    customer: {
-      name: "Мөнхжин С.",
-      avatar:
-        "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-    },
-    lastMessage: "Хүргэлт хэзээ ирэх вэ?",
-    unread: 1,
-    status: "agreed",
-    items: ["Кабель ВВГ 3x2.5 x100м"],
-    expectedPrice: 350000,
-    updatedAt: new Date("2024-01-17T09:15:00"),
-  },
-  {
-    id: "3",
-    customer: {
-      name: "Оюунтөгс Б.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-    },
-    lastMessage: "Баярлалаа, бараа ирлээ.",
-    unread: 0,
-    status: "completed",
-    items: ["Арматур 12мм x20м"],
-    expectedPrice: 90000,
-    updatedAt: new Date("2024-01-16T16:00:00"),
-  },
-  {
-    id: "4",
-    customer: {
-      name: "Болд Т.",
-      avatar:
-        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face",
-    },
-    lastMessage: "Ойлголоо, баярлалаа!",
-    unread: 0,
-    status: "negotiating",
-    items: ["Тоосго x1000ш"],
-    expectedPrice: 450000,
-    updatedAt: new Date("2024-01-16T14:30:00"),
-  },
-];
-
 const statusConfig = {
   negotiating: { label: "Тохиролцож байна", color: "bg-warning" },
   agreed: { label: "Тохирсон", color: "bg-success" },
-  completed: { label: "Дууссан", color: "bg-muted" },
+  cancelled: { label: "Цуцлагдсан", color: "bg-destructive" },
 };
 
 export default function OwnerChats() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+
+  const [chats, setChats] = useState<ChatPreview[]>([]);
+  useEffect(() => {
+    async function loadChats() {
+      try {
+        const ownerId = profile?.id ?? user?.id;
+        if (!ownerId) return;
+        // find owner's stores
+        const { data: stores } = await supabase
+          .from("stores")
+          .select("id")
+          .eq("owner_id", ownerId);
+        const storeRows = (stores ??
+          []) as Database["public"]["Tables"]["stores"]["Row"][];
+        const storeIds = storeRows.map((s) => s.id);
+        if (!storeIds.length) return setChats([]);
+
+        // fetch chats associated with those stores
+        const { data: chatRows, error } = await supabase
+          .from("chats")
+          .select(
+            "id, user_id, last_message, unread_count, status, expected_price, created_at, updated_at",
+          )
+          .in("store_id", storeIds)
+          .order("updated_at", { ascending: false });
+        if (error) throw error;
+        const rows = (chatRows ??
+          []) as Database["public"]["Tables"]["chats"]["Row"][];
+
+        // fetch user profiles for participants
+        const userIds = Array.from(
+          new Set(rows.map((r) => r.user_id).filter(Boolean)),
+        );
+        const { data: profiles } = (await supabase
+          .from("profiles")
+          .select("id, name, avatar")
+          .in("id", userIds as string[])) as {
+          data: Database["public"]["Tables"]["profiles"]["Row"][] | null;
+          error: any;
+        };
+
+        const mapped: ChatPreview[] = rows.map((r) => {
+          const profile = (profiles ?? []).find((p: any) => p.id === r.user_id);
+          return {
+            id: r.id,
+            customer: {
+              name: profile?.name ?? "Хэрэглэгч",
+              avatar: profile?.avatar ?? "",
+            },
+            lastMessage: r.last_message ?? "",
+            unread: r.unread_count ?? 0,
+            status: r.status,
+            items: [],
+            expectedPrice: r.expected_price ?? undefined,
+            updatedAt: r.updated_at
+              ? new Date(r.updated_at)
+              : new Date(r.created_at ?? undefined),
+          };
+        });
+
+        setChats(mapped);
+      } catch (err) {
+        console.error("Failed to load chats:", err);
+      }
+    }
+
+    loadChats();
+  }, [user, profile?.id]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "negotiating">("all");
 
-  const filteredChats = mockChats.filter((chat) => {
+  const filteredChats = chats.filter((chat) => {
     const matchesSearch =
       chat.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
@@ -109,9 +123,9 @@ export default function OwnerChats() {
     return matchesSearch;
   });
 
-  const unreadCount = mockChats.reduce((sum, c) => sum + c.unread, 0);
-  const negotiatingCount = mockChats.filter(
-    (c) => c.status === "negotiating"
+  const unreadCount = chats.reduce((sum, c) => sum + (c.unread || 0), 0);
+  const negotiatingCount = chats.filter(
+    (c) => c.status === "negotiating",
   ).length;
 
   return (
@@ -212,7 +226,7 @@ export default function OwnerChats() {
                         "text-sm mt-1 line-clamp-1",
                         chat.unread > 0
                           ? "text-foreground font-medium"
-                          : "text-muted-foreground"
+                          : "text-muted-foreground",
                       )}>
                       {chat.lastMessage}
                     </p>
@@ -231,7 +245,7 @@ export default function OwnerChats() {
                     <div className="mt-2 flex items-center justify-between">
                       {chat.expectedPrice && (
                         <span className="text-sm font-medium text-primary">
-                          ~₮{chat.expectedPrice.toLocaleString()}
+                          ~₮{chat.expectedPrice?.toLocaleString()}
                         </span>
                       )}
                       <span className="text-2xs text-muted-foreground flex items-center gap-1">

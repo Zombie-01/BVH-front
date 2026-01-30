@@ -19,7 +19,7 @@ export default function DriverMap() {
     mockDeliveryTasks.find((t) => t.status === "picked_up") ||
     mockDeliveryTasks[0];
   const vehicle = vehicleTypes.find(
-    (v) => v.id === activeTask?.vehicleRequired
+    (v) => v.id === activeTask?.vehicleRequired,
   );
 
   return (
@@ -93,7 +93,7 @@ export default function DriverMap() {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-primary">
-                    ₮{activeTask.reward.toLocaleString()}
+                    ₮{activeTask.reward?.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {activeTask.distance}км
@@ -144,8 +144,8 @@ export default function DriverMap() {
                 {activeTask.status === "assigned"
                   ? "Захиалга авах"
                   : activeTask.status === "picked_up"
-                  ? "Хүргэлт эхлүүлэх"
-                  : "Хүргэсэн гэж тэмдэглэх"}
+                    ? "Хүргэлт эхлүүлэх"
+                    : "Хүргэсэн гэж тэмдэглэх"}
               </Button>
             </>
           )}

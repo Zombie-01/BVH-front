@@ -97,7 +97,7 @@ export default function DriverTasks() {
           {activeTasks.map((task, index) => {
             const status = statusConfig[task.status];
             const vehicle = vehicleTypes.find(
-              (v) => v.id === task.vehicleRequired
+              (v) => v.id === task.vehicleRequired,
             );
 
             return (
@@ -178,7 +178,7 @@ export default function DriverTasks() {
                 <div className="mt-4 flex items-center justify-between">
                   <div>
                     <span className="text-lg font-bold text-primary">
-                      ₮{task.reward.toLocaleString()}
+                      ₮{task.reward?.toLocaleString()}
                     </span>
                     <span className="text-xs text-muted-foreground ml-1">
                       орлого

@@ -130,7 +130,7 @@ export default function WorkerJobs() {
 
   const newJobsCount = mockJobs.filter((j) => j.status === "new").length;
   const activeJobsCount = mockJobs.filter((j) =>
-    ["quoted", "accepted", "in_progress"].includes(j.status)
+    ["quoted", "accepted", "in_progress"].includes(j.status),
   ).length;
 
   return (
@@ -245,14 +245,14 @@ export default function WorkerJobs() {
                   <div>
                     <p className="text-xs text-muted-foreground">Төсөв</p>
                     <span className="font-bold text-foreground">
-                      ~₮{job.expectedBudget.toLocaleString()}
+                      ~₮{job.expectedBudget?.toLocaleString()}
                     </span>
                   </div>
                   {job.quotedPrice && (
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Миний үнэ</p>
                       <span className="font-bold text-primary">
-                        ₮{job.quotedPrice.toLocaleString()}
+                        ₮{job.quotedPrice?.toLocaleString()}
                       </span>
                     </div>
                   )}

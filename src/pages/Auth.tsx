@@ -71,18 +71,35 @@ export default function Auth() {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    const handleRedirect = async (session: any) => {
+      if (!session) return;
+      // Fetch user profile to get role
+      const userId = session.user.id;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+      if (!profile) {
+        // If profile is null, navigate to a default page or handle accordingly
         navigate("/home");
+        return;
       }
+      const role = profile.role;
+      if (role === "store_owner") navigate("/owner/dashboard");
+      else if (role === "driver") navigate("/driver/tasks");
+      else if (role === "service_worker") navigate("/worker/jobs");
+      else navigate("/home");
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleRedirect(session);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate("/home");
-      }
+      handleRedirect(session);
     });
 
     return () => subscription.unsubscribe();
@@ -145,7 +162,7 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/role-selection`,
+          redirectTo: `${window.location.origin}/`,
         },
       });
 

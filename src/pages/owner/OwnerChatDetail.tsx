@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import {
   ArrowLeft,
   Send,
@@ -24,80 +27,161 @@ import { AppLayout } from "@/components/layout/AppLayout";
 
 interface ChatData {
   id: string;
-  customer: { name: string; avatar: string };
+  customer: { id?: string | null; name: string | null; avatar?: string | null };
   items: OrderItem[];
-  expectedPrice: number;
+  expectedPrice?: number | null;
   status: "negotiating" | "agreed" | "completed";
 }
-
-const mockChatData: ChatData = {
-  id: "1",
-  customer: {
-    name: "Батболд Д.",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
-  },
-  items: [
-    {
-      productId: "1",
-      productName: "Цемент ПЦ-400",
-      quantity: 10,
-      price: 25000,
-      image:
-        "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop",
-    },
-    {
-      productId: "2",
-      productName: "Элс 1м³",
-      quantity: 2,
-      price: 40000,
-      image:
-        "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=200&h=200&fit=crop",
-    },
-  ],
-  expectedPrice: 355000,
-  status: "negotiating",
-};
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: "1",
-    chatId: "1",
-    senderId: "user-1",
-    senderRole: "user",
-    content: "Сайн байна уу, энэ барааны үнийг тохиролцож болох уу?",
-    createdAt: new Date("2024-01-17T10:00:00"),
-    read: true,
-    messageType: "text",
-  },
-  {
-    id: "2",
-    chatId: "1",
-    senderId: "user-1",
-    senderRole: "user",
-    content: "340,000₮ санал болгож байна",
-    createdAt: new Date("2024-01-17T10:02:00"),
-    read: true,
-    messageType: "price_proposal",
-    dealAmount: 340000,
-  },
-];
 
 export default function OwnerChatDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
 
-  const [chatData] = useState<ChatData>(mockChatData);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [chatDataState, setChatDataState] = useState<ChatData | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Map convenience name
+  const chatData = chatDataState;
+
+  // upload helper for chat media
+  const uploadToStorage = async (file: File, folder: string) => {
+    const path = `${folder}/${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage
+      .from("chat-media")
+      .upload(path, file, { upsert: true });
+    if (error) throw error;
+    const urlRes = supabase.storage.from("chat-media").getPublicUrl(path);
+    return urlRes.data?.publicUrl ?? null;
+  };
+
+  // load chat and messages, subscribe to new messages
+  useEffect(() => {
+    let channel: never | null = null;
+    async function load() {
+      if (!id) return;
+      // load chat
+      const { data: chatRow } = (await supabase
+        .from("chats")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chats"]["Row"] | null;
+        error: any;
+      };
+      if (chatRow) {
+        const { data: profileRow } = (await supabase
+          .from("profiles")
+          .select("id, name, avatar")
+          .eq("id", chatRow.user_id)
+          .maybeSingle()) as {
+          data: Database["public"]["Tables"]["profiles"]["Row"] | null;
+          error: any;
+        };
+        setChatDataState({
+          id: chatRow.id,
+          customer: {
+            id: chatRow.user_id ?? null,
+            name: profileRow?.name ?? null,
+            avatar: profileRow?.avatar ?? null,
+          },
+          items: [],
+          expectedPrice: chatRow.expected_price ?? null,
+          status: chatRow.status as any,
+        });
+      }
+
+      // load messages
+      const { data: msgs } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("chat_id", id)
+        .order("created_at", { ascending: true });
+      const mapped = (msgs ?? []).map(
+        (m: any) =>
+          ({
+            id: m.id,
+            chatId: m.chat_id,
+            senderId: m.sender_id,
+            senderRole: m.sender_role,
+            content: m.content ?? "",
+            imageUrl: m.image_url ?? undefined,
+            createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+            read: !!m.read,
+            messageType: m.message_type as any,
+            dealAmount: m.deal_amount ?? undefined,
+          }) as ChatMessage,
+      );
+      setMessages(mapped);
+
+      // mark chat as read for owner (clear unread count)
+      try {
+        await (supabase as any)
+          .from("chats")
+          .update({
+            unread_count: 0,
+          } as Database["public"]["Tables"]["chats"]["Update"])
+          .eq("id", id);
+      } catch (e) {
+        /* ignore */
+      }
+
+      // subscribe to new messages for this chat
+      channel = supabase
+        .channel(`chat-${id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_messages",
+            filter: `chat_id=eq.${id}`,
+          },
+          (payload: any) => {
+            const m = payload.new;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: m.id,
+                chatId: m.chat_id,
+                senderId: m.sender_id,
+                senderRole: m.sender_role,
+                content: m.content ?? "",
+                imageUrl: m.image_url ?? undefined,
+                createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+                read: !!m.read,
+                messageType: m.message_type as any,
+                dealAmount: m.deal_amount ?? undefined,
+              } as ChatMessage,
+            ]);
+          },
+        )
+        .subscribe();
+    }
+
+    load();
+    return () => {
+      if (channel) channel.unsubscribe?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // chatData is loaded from DB into state above
   const [newMessage, setNewMessage] = useState("");
   const [showProductHeader, setShowProductHeader] = useState(true);
   const [chatStatus, setChatStatus] = useState<
     "negotiating" | "agreed" | "completed"
-  >(chatData.status);
+  >("negotiating");
   const [agreedPrice, setAgreedPrice] = useState<number | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<number | null>(340000);
+  const [pendingProposal, setPendingProposal] = useState<number | null>(null);
   const [showCounterInput, setShowCounterInput] = useState(false);
   const [counterPrice, setCounterPrice] = useState("");
+
+  useEffect(() => {
+    if (!chatData) return;
+    setChatStatus(chatData.status);
+    setPendingProposal(chatData.expectedPrice ?? null);
+  }, [chatData]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,42 +194,92 @@ export default function OwnerChatDetail() {
     scrollToBottom();
   }, [messages]);
 
-  const handleAcceptPrice = (price: number) => {
+  const handleAcceptPrice = async (price: number) => {
     setAgreedPrice(price);
     setChatStatus("agreed");
     setPendingProposal(null);
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "owner-1",
-      senderRole: "store",
-      content: `${price.toLocaleString()}₮-р зөвшөөрлөө ✓`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "deal_accepted",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
+    if (!id || !user) return;
+
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? user.id,
+        sender_role: "store",
+        content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+        message_type: "deal_accepted",
+        deal_amount: price,
+      } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data } = (await supabase
+        .from("chat_messages")
+        .insert(
+          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
+        )
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: any;
+      };
+
+      if (data) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          } as any,
+        ]);
+        await (supabase as any)
+          .from("chats")
+          .update({
+            last_message: payload.content,
+            updated_at: new Date().toISOString(),
+          } as Database["public"]["Tables"]["chats"]["Update"])
+          .eq("id", id);
+      }
+    } catch (err) {
+      console.error("Accept price failed:", err);
+    }
   };
 
-  const handleRejectPrice = () => {
+  const handleRejectPrice = async () => {
     setPendingProposal(null);
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "owner-1",
-      senderRole: "store",
-      content: "Уучлаарай, энэ үнэ тохирохгүй байна",
-      createdAt: new Date(),
-      read: false,
-      messageType: "deal_rejected",
-    };
-    setMessages((prev) => [...prev, message]);
+    if (!id || !user) return;
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? user.id,
+        sender_role: "store",
+        content: "Уучлаарай, энэ үнэ тохирохгүй байна",
+        message_type: "deal_rejected",
+      } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data } = (await supabase
+        .from("chat_messages")
+        .insert(
+          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
+        )
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: any;
+      };
+      if (data)
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          } as any,
+        ]);
+    } catch (err) {
+      console.error("Reject price failed:", err);
+    }
   };
 
-  const handleCounterOffer = () => {
+  const handleCounterOffer = async () => {
     const price = parseInt(counterPrice.replace(/,/g, ""));
     if (price <= 0) return;
 
@@ -153,79 +287,163 @@ export default function OwnerChatDetail() {
     setShowCounterInput(false);
     setCounterPrice("");
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "owner-1",
-      senderRole: "store",
-      content: `${price.toLocaleString()}₮ санал болгож байна`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "price_proposal",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
+    if (!id || !user) return;
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? user.id,
+        sender_role: "store",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        message_type: "price_proposal",
+        deal_amount: price,
+      } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-    // Simulate user response
-    setTimeout(() => {
-      if (Math.random() > 0.5) {
-        handleAcceptPrice(price);
-      } else {
-        const userCounter = Math.round(price * 0.95);
-        setPendingProposal(userCounter);
-        const counterMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          chatId: id || "1",
-          senderId: "user-1",
-          senderRole: "user",
-          content: `${userCounter.toLocaleString()}₮ санал болгож байна`,
-          createdAt: new Date(),
-          read: true,
-          messageType: "price_proposal",
-          dealAmount: userCounter,
-        };
-        setMessages((prev) => [...prev, counterMessage]);
-      }
-    }, 1500);
-  };
-
-  const handleSend = () => {
-    if (!newMessage.trim()) return;
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "owner-1",
-      senderRole: "store",
-      content: newMessage.trim(),
-      createdAt: new Date(),
-      read: false,
-      messageType: "text",
-    };
-
-    setMessages((prev) => [...prev, message]);
-    setNewMessage("");
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const message: ChatMessage = {
-          id: Date.now().toString(),
-          chatId: id || "1",
-          senderId: "owner-1",
-          senderRole: "store",
-          content: "Зураг илгээлээ",
-          imageUrl: reader.result as string,
-          createdAt: new Date(),
-          read: false,
-          messageType: "image",
-        };
-        setMessages((prev) => [...prev, message]);
+      const { data } = (await supabase
+        .from("chat_messages")
+        .insert(
+          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
+        )
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: any;
       };
-      reader.readAsDataURL(file);
+      if (data)
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          } as any,
+        ]);
+
+      // quick simulated response (can be replaced by real user flow)
+      setTimeout(async () => {
+        if (Math.random() > 0.5) {
+          await handleAcceptPrice(price);
+        } else {
+          const userCounter = Math.round(price * 0.95);
+          setPendingProposal(userCounter);
+          const counterPayload = {
+            chat_id: id,
+            sender_id: chatData?.customer.id ?? null,
+            sender_role: "user",
+            content: `${userCounter?.toLocaleString()}₮ санал болгож байна`,
+            message_type: "price_proposal",
+            deal_amount: userCounter,
+          } as any;
+          const res = await supabase
+            .from("chat_messages")
+            .insert(counterPayload)
+            .select()
+            .maybeSingle();
+          if (res.data)
+            setMessages((prev) => [
+              ...prev,
+              {
+                ...res.data,
+                createdAt: res.data.created_at
+                  ? new Date(res.data.created_at)
+                  : new Date(),
+              } as any,
+            ]);
+        }
+      }, 1500);
+    } catch (err) {
+      console.error("Counter offer failed:", err);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !id || !user) return;
+
+    try {
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? user.id,
+        sender_role: "store",
+        content: newMessage.trim(),
+        message_type: "text",
+      } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      // insert message
+      const { data } = (await supabase
+        .from("chat_messages")
+        .insert(
+          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
+        )
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: any;
+      };
+      if (data) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          } as any,
+        ]);
+        // update chat last message
+        await (supabase as any)
+          .from("chats")
+          .update({
+            last_message: payload.content,
+            updated_at: new Date().toISOString(),
+          } as Database["public"]["Tables"]["chats"]["Update"])
+          .eq("id", id);
+        setNewMessage("");
+      }
+    } catch (err) {
+      console.error("Send message failed:", err);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id || !user) return;
+    try {
+      const publicUrl = await uploadToStorage(file, id);
+      // insert message with image_url
+      const payload = {
+        chat_id: id,
+        sender_id: profile?.id ?? user.id,
+        sender_role: "store",
+        content: "Зураг илгээлээ",
+        image_url: publicUrl,
+        message_type: "image",
+      } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
+
+      const { data } = (await supabase
+        .from("chat_messages")
+        .insert(
+          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
+        )
+        .select()
+        .maybeSingle()) as {
+        data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
+        error: any;
+      };
+      if (data)
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          } as any,
+        ]);
+
+      // update chat last message
+      await supabase
+        .from("chats")
+        .update({
+          last_message: payload.content,
+          updated_at: new Date().toISOString(),
+        } as Database["public"]["Tables"]["chats"]["Update"])
+        .eq("id", id);
+    } catch (err) {
+      console.error("Image upload failed:", err);
     }
   };
 
@@ -271,8 +489,8 @@ export default function OwnerChatDetail() {
                 ? "bg-primary/20 border-2 border-primary rounded-br-md"
                 : "bg-primary text-primary-foreground rounded-br-md"
               : message.messageType === "price_proposal"
-              ? "bg-card border-2 border-primary rounded-bl-md"
-              : "bg-card border border-border rounded-bl-md"
+                ? "bg-card border-2 border-primary rounded-bl-md"
+                : "bg-card border border-border rounded-bl-md"
           }`}>
           {message.imageUrl && (
             <img
@@ -313,13 +531,13 @@ export default function OwnerChatDetail() {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <img
-            src={chatData.customer.avatar}
-            alt={chatData.customer.name}
+            src={chatData?.customer.avatar ?? ""}
+            alt={chatData?.customer.name ?? ""}
             className="w-10 h-10 rounded-full object-cover"
           />
           <div className="flex-1">
             <h1 className="font-semibold text-foreground">
-              {chatData.customer.name}
+              {chatData?.customer.name ?? "-"}
             </h1>
             <p
               className={`text-xs ${
@@ -351,7 +569,7 @@ export default function OwnerChatDetail() {
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-primary" />
               <span className="font-medium text-sm">
-                {chatData.items.length} бараа
+                {chatData?.items?.length ?? 0} бараа
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -359,8 +577,10 @@ export default function OwnerChatDetail() {
                 variant={chatStatus === "agreed" ? "default" : "secondary"}
                 className={chatStatus === "agreed" ? "bg-green-500" : ""}>
                 {agreedPrice
-                  ? `${agreedPrice.toLocaleString()}₮`
-                  : `~${chatData.expectedPrice.toLocaleString()}₮`}
+                  ? `${agreedPrice?.toLocaleString()}₮`
+                  : chatData?.expectedPrice
+                    ? `~${chatData.expectedPrice?.toLocaleString()}₮`
+                    : "—"}
               </Badge>
               {showProductHeader ? (
                 <ChevronUp className="w-4 h-4" />
@@ -377,7 +597,7 @@ export default function OwnerChatDetail() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="px-4 pb-3 space-y-2">
-                {chatData.items.map((item, index) => (
+                {chatData?.items?.map((item, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-3 bg-muted rounded-lg p-2">
@@ -393,7 +613,7 @@ export default function OwnerChatDetail() {
                         {item.productName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity} x {item.price.toLocaleString()}₮
+                        {item.quantity} x {item.price?.toLocaleString()}₮
                       </p>
                     </div>
                   </div>
@@ -443,7 +663,7 @@ export default function OwnerChatDetail() {
               </div>
 
               <p className="text-2xl font-bold text-primary mb-4">
-                {pendingProposal.toLocaleString()}₮
+                {pendingProposal?.toLocaleString()}₮
               </p>
 
               {!showCounterInput ? (
@@ -509,7 +729,7 @@ export default function OwnerChatDetail() {
                 <div>
                   <h3 className="font-bold text-lg">Захиалга баталгаажлаа!</h3>
                   <p className="text-white/80">
-                    Тохирсон үнэ: {agreedPrice.toLocaleString()}₮
+                    Тохирсон үнэ: {agreedPrice?.toLocaleString()}₮
                   </p>
                 </div>
               </div>

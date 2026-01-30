@@ -35,6 +35,7 @@ interface ProductModalProps {
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
   onSave: (product: Product) => void;
+  categories?: string[]; // categories provided by parent (store categories)
 }
 
 const categories = [
@@ -51,6 +52,7 @@ export function ProductModal({
   onOpenChange,
   product,
   onSave,
+  categories: categoriesProp,
 }: ProductModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Product>({
@@ -58,10 +60,18 @@ export function ProductModal({
     description: "",
     price: 0,
     unit: "ширхэг",
-    category: categories[0],
+    category: categoriesProp?.[0] ?? "",
     image: "",
     inStock: true,
   });
+
+  // Use categories prop if provided to set default category
+  useEffect(() => {
+    if (!product && categoriesProp && categoriesProp.length) {
+      setFormData((f) => ({ ...f, category: categoriesProp[0] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriesProp]);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -73,12 +83,12 @@ export function ProductModal({
         description: "",
         price: 0,
         unit: "ширхэг",
-        category: categories[0],
+        category: categoriesProp?.[0] ?? "",
         image: "",
         inStock: true,
       });
     }
-  }, [product, open]);
+  }, [product, open, categoriesProp]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -291,7 +301,7 @@ export function ProductModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
+                {(categoriesProp || []).map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
                   </SelectItem>

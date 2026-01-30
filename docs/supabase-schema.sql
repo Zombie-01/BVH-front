@@ -85,6 +85,8 @@ CREATE TABLE public.store_categories (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

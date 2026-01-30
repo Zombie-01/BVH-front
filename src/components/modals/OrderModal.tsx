@@ -93,7 +93,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
   const handleItemChange = (
     index: number,
     field: keyof OrderItem,
-    value: string | number
+    value: string | number,
   ) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -103,7 +103,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
   const calculateTotal = () => {
     return formData.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0
+      0,
     );
   };
 
@@ -235,7 +235,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
                               handleItemChange(
                                 index,
                                 "quantity",
-                                Math.max(1, item.quantity - 1)
+                                Math.max(1, item.quantity - 1),
                               )
                             }>
                             <Minus className="w-4 h-4" />
@@ -247,7 +247,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
                               handleItemChange(
                                 index,
                                 "quantity",
-                                parseInt(e.target.value) || 1
+                                parseInt(e.target.value) || 1,
                               )
                             }
                             className="text-center w-16"
@@ -262,7 +262,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
                               handleItemChange(
                                 index,
                                 "quantity",
-                                item.quantity + 1
+                                item.quantity + 1,
                               )
                             }>
                             <Plus className="w-4 h-4" />
@@ -278,7 +278,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
                             handleItemChange(
                               index,
                               "price",
-                              parseInt(e.target.value) || 0
+                              parseInt(e.target.value) || 0,
                             )
                           }
                           placeholder="0"
@@ -289,7 +289,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
                     <div className="text-right text-sm text-muted-foreground">
                       Дүн:{" "}
                       <span className="font-medium text-foreground">
-                        ₮{(item.price * item.quantity).toLocaleString()}
+                        ₮{(item.price * item.quantity)?.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -336,7 +336,7 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
           <div className="p-4 bg-primary/10 rounded-xl flex items-center justify-between">
             <span className="font-medium text-foreground">Нийт дүн:</span>
             <span className="text-2xl font-bold text-primary">
-              ₮{calculateTotal().toLocaleString()}
+              ₮{calculateTotal()?.toLocaleString()}
             </span>
           </div>
 

@@ -209,13 +209,13 @@ export default function WorkerQuotes() {
                       Хэрэглэгчийн төсөв
                     </p>
                     <span className="font-bold text-foreground">
-                      ₮{quote.customerBudget.toLocaleString()}
+                      ₮{quote.customerBudget?.toLocaleString()}
                     </span>
                   </div>
                   <div className="bg-primary/10 rounded-xl p-3">
                     <p className="text-xs text-muted-foreground">Миний үнэ</p>
                     <span className="font-bold text-primary">
-                      ₮{quote.quotedPrice.toLocaleString()}
+                      ₮{quote.quotedPrice?.toLocaleString()}
                     </span>
                   </div>
                 </div>

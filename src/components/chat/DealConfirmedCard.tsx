@@ -37,7 +37,7 @@ export function DealConfirmedCard({
 
       <div className="bg-white/10 rounded-xl p-4 mb-4">
         <p className="text-white/70 text-sm">Тохирсон үнэ</p>
-        <p className="text-3xl font-bold">{agreedPrice.toLocaleString()}₮</p>
+        <p className="text-3xl font-bold">{agreedPrice?.toLocaleString()}₮</p>
         {storeName && <p className="text-white/80 text-sm mt-1">{storeName}</p>}
       </div>
 

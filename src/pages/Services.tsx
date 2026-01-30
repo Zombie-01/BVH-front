@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, SlidersHorizontal } from "lucide-react";
@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ServiceWorkerCard } from "@/components/common/ServiceWorkerCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
-import { mockServiceWorkers, serviceCategories } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import type { ServiceWorker } from "@/types";
 
 export default function Services() {
   const navigate = useNavigate();
@@ -15,17 +17,81 @@ export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
 
-  const filteredWorkers = mockServiceWorkers.filter((worker) => {
+  const [workers, setWorkers] = useState<ServiceWorker[]>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+
+  useEffect(() => {
+    const loadWorkers = async () => {
+      try {
+        const { data: workerRows } = (await supabase
+          .from("service_workers")
+          .select("*")
+          .order("rating", { ascending: false })) as {
+          data: Database["public"]["Tables"]["service_workers"]["Row"][] | null;
+          error: unknown;
+        };
+
+        const rows = workerRows ?? [];
+        const profileIds = Array.from(
+          new Set(rows.map((r) => r.profile_id).filter(Boolean)),
+        );
+        const { data: profiles } = profileIds.length
+          ? ((await supabase
+              .from("profiles")
+              .select("id, name, avatar, phone")
+              .in("id", profileIds as string[])) as {
+              data: Database["public"]["Tables"]["profiles"]["Row"][] | null;
+              error: unknown;
+            })
+          : {
+              data: [] as
+                | Database["public"]["Tables"]["profiles"]["Row"][]
+                | null,
+            };
+
+        const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+        const mapped = rows.map((r) => ({
+          id: r.id,
+          name: profileMap.get(r.profile_id ?? "")?.name ?? "Мэргэжилтэн",
+          avatar: profileMap.get(r.profile_id ?? "")?.avatar ?? "",
+          specialty: r.specialty,
+          rating: r.rating ?? 0,
+          completedJobs: r.completed_jobs ?? 0,
+          badges: r.badges ?? [],
+          hourlyRate: r.hourly_rate ?? 0,
+          isAvailable: r.is_available,
+          phone: profileMap.get(r.profile_id ?? "")?.phone ?? undefined,
+          description: r.description ?? undefined,
+        }));
+
+        setWorkers(mapped);
+
+        const uniq = Array.from(
+          new Set(rows.map((r) => r.specialty).filter(Boolean)),
+        );
+        const cats = [
+          { id: "all", label: "Бүгд" },
+          ...uniq.map((s) => ({ id: s, label: s })),
+        ];
+        setCategories(cats);
+      } catch (err) {
+        console.error("Failed to load workers:", err);
+      }
+    };
+
+    loadWorkers();
+  }, []);
+
+  const filteredWorkers = workers.filter((worker) => {
     const matchesSearch =
       worker.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       worker.specialty.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesAvailability = !showAvailableOnly || worker.isAvailable;
-    const selectedCategory = serviceCategories.find(
-      (c) => c.id === activeCategory
-    );
     const matchesCategory =
-      activeCategory === "all" ||
-      worker.specialty === selectedCategory?.specialty;
+      activeCategory === "all" || worker.specialty === activeCategory;
     return matchesSearch && matchesAvailability && matchesCategory;
   });
 
@@ -76,11 +142,10 @@ export default function Services() {
       {/* Categories */}
       <section className="py-4 max-w-7xl mx-auto">
         <div className="flex gap-2 px-4 lg:px-6 overflow-x-auto scrollbar-hide">
-          {serviceCategories.map((category) => (
+          {categories.map((category) => (
             <CategoryPill
               key={category.id}
               label={category.label}
-              icon={category.icon}
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />

@@ -27,7 +27,7 @@ export function UserPriceInput({
 
   const formatPrice = (value: string) => {
     const num = value.replace(/[^0-9]/g, "");
-    return num ? parseInt(num).toLocaleString() : "";
+    return num ? parseInt(num)?.toLocaleString() : "";
   };
 
   return (
@@ -79,7 +79,7 @@ export function UserPriceInput({
               className="flex-1 text-xs"
               onClick={() => setPrice(discountPrice.toString())}
               disabled={disabled}>
-              {discountPrice.toLocaleString()}₮
+              {discountPrice?.toLocaleString()}₮
               <span className="text-muted-foreground ml-1">
                 ({Math.round((1 - multiplier) * 100)}%↓)
               </span>

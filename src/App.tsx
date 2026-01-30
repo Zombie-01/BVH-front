@@ -8,7 +8,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 // Pages
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import RoleSelection from "./pages/RoleSelection";
 import Home from "./pages/Home";
 import Stores from "./pages/Stores";
 import Services from "./pages/Services";
@@ -59,7 +58,6 @@ const App = () => (
             {/* Onboarding */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/role-selection" element={<RoleSelection />} />
 
             {/* User Routes */}
             <Route path="/home" element={<Home />} />

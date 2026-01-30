@@ -19,7 +19,9 @@ import { StoreCard } from "@/components/common/StoreCard";
 import { ServiceWorkerCard } from "@/components/common/ServiceWorkerCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockStores, mockServiceWorkers, categories } from "@/data/mockData";
+import { categories } from "@/data/mockData";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const quickActions = [
   { id: "order", label: "Бараа захиалах", icon: Package, color: "bg-primary" },
@@ -32,10 +34,33 @@ export default function Home() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const featuredStores = mockStores.slice(0, 3);
-  const topWorkers = mockServiceWorkers
-    .filter((w) => w.isAvailable)
-    .slice(0, 3);
+  // Data will be fetched from Supabase
+  const [featuredStores, setFeaturedStores] = useState<any[]>([]);
+  const [topWorkers, setTopWorkers] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch top 3 featured stores
+    supabase
+      .from("stores")
+      .select("*")
+      .eq("is_open", true)
+      .order("rating", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data) setFeaturedStores(data);
+      });
+
+    // Fetch top 3 available service workers
+    supabase
+      .from("service_workers")
+      .select("*")
+      .eq("is_available", true)
+      .order("rating", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data) setTopWorkers(data);
+      });
+  }, []);
 
   return (
     <AppLayout>

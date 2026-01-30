@@ -30,7 +30,7 @@ export const AnimatedCounter = ({
       if (!startTime) startTime = currentTime;
       const progress = Math.min(
         (currentTime - startTime) / (duration * 1000),
-        1
+        1,
       );
 
       // Easing function for smooth animation
@@ -51,7 +51,7 @@ export const AnimatedCounter = ({
   return (
     <span ref={ref} className="tabular-nums">
       {prefix}
-      {count.toLocaleString()}
+      {count?.toLocaleString()}
       {suffix}
     </span>
   );

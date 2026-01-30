@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, MapPin } from "lucide-react";
@@ -7,17 +7,53 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StoreCard } from "@/components/common/StoreCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
-import { mockStores, categories } from "@/data/mockData";
+import { categories } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import type { Store } from "@/types"; // App shape for UI components
 
 export default function Stores() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [stores, setStores] = useState<Store[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredStores = mockStores.filter((store) => {
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase.from("stores").select("*");
+      if (!mounted) return;
+      const rows = (data ??
+        []) as Database["public"]["Tables"]["stores"]["Row"][];
+      const mapped: Store[] = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description ?? "",
+        image: r.image ?? "",
+        rating: r.rating ?? 0,
+        reviewCount: r.review_count ?? 0,
+        category: (r.categories && r.categories[0]) || "other",
+        location: r.location ?? "",
+        isOpen: r.is_open,
+        phone: r.phone ?? undefined,
+      }));
+      setStores(mapped);
+      setLoading(false);
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filteredStores = stores.filter((store) => {
     const matchesSearch =
       store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (store.description || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
     const matchesCategory =
       activeCategory === "all" || store.category === activeCategory;
     return matchesSearch && matchesCategory;
