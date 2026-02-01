@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; URL=/" />
+    <meta name="robots" content="noindex" />
+    <title>Redirecting…</title>
+    <script>
+      // Try to preserve the requested path by rewriting to hash-based route
+      (function () {
+        try {
+          const p = location.pathname + location.search + location.hash;
+          // If the root is requested, go to /; otherwise rewrite to hash route
+          if (p && p !== "/") {
+            location.replace('/#' + p);
+          } else {
+            location.replace('/');
+          }
+        } catch (e) {
+          location.replace('/');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>
