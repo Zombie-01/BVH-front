@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => ({
         injectRegister: "auto",
         includeAssets: ["favicon.svg", "robots.txt", "apple-touch-icon.png"],
         manifest: {
-          name: "Барилгын Үйлчилгээний Хаб",
-          short_name: "Үйлчилгээний Хаб",
+          name: "Барилгын Үйлчилгээний Хүргэлт",
+          short_name: "Үйлчилгээний Хүргэлт",
           description:
             "Барилгын материал, хүргэлт, мэргэжлийн үйлчилгээг нэг дороос олоорой.",
           theme_color: "#f97316",

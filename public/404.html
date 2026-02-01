@@ -12,12 +12,12 @@
           const p = location.pathname + location.search + location.hash;
           // If the root is requested, go to /; otherwise rewrite to hash route
           if (p && p !== "/") {
-            location.replace('/#' + p);
+            location.replace("/#" + p);
           } else {
-            location.replace('/');
+            location.replace("/");
           }
         } catch (e) {
-          location.replace('/');
+          location.replace("/");
         }
       })();
     </script>

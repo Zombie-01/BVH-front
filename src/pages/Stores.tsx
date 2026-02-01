@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StoreCard } from "@/components/common/StoreCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
-import { categories } from "@/data/mockData";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Store } from "@/types"; // App shape for UI components
@@ -18,6 +17,11 @@ export default function Stores() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // categories loaded from Supabase (includes an "all" entry)
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([
+    { id: "all", name: "Бүгд" },
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -48,6 +52,32 @@ export default function Stores() {
     };
   }, []);
 
+  // load categories from Supabase
+  useEffect(() => {
+    let mounted = true;
+    const loadCategories = async () => {
+      const { data, error } = await supabase
+        .from("store_categories")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (!mounted) return;
+      if (error) {
+        // keep the default "all" entry on error
+        console.error("Failed to load categories", error);
+        return;
+      }
+      const rows = (data ?? []) as { id: string; name: string }[];
+      setCategories([
+        { id: "all", name: "Бүгд" },
+        ...rows.map((r) => ({ id: String(r.id), name: r.name })),
+      ]);
+    };
+    loadCategories();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const filteredStores = stores.filter((store) => {
     const matchesSearch =
       store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,7 +85,8 @@ export default function Stores() {
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
     const matchesCategory =
-      activeCategory === "all" || store.category === activeCategory;
+      activeCategory === "all" ||
+      String(store.category) === String(activeCategory);
     return matchesSearch && matchesCategory;
   });
 
@@ -100,8 +131,8 @@ export default function Stores() {
           {categories.map((category) => (
             <CategoryPill
               key={category.id}
-              label={category.label}
-              icon={category.icon}
+              label={category.name}
+              icon={MapPin} // fallback icon — category icon not provided by DB
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />

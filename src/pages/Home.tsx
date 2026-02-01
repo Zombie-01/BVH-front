@@ -19,8 +19,6 @@ import { StoreCard } from "@/components/common/StoreCard";
 import { ServiceWorkerCard } from "@/components/common/ServiceWorkerCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
 import { useAuth } from "@/contexts/AuthContext";
-import { categories } from "@/data/mockData";
-import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const quickActions = [
@@ -37,6 +35,11 @@ export default function Home() {
   // Data will be fetched from Supabase
   const [featuredStores, setFeaturedStores] = useState<any[]>([]);
   const [topWorkers, setTopWorkers] = useState<any[]>([]);
+
+  // categories from Supabase (include "all")
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([
+    { id: "all", name: "Бүгд" },
+  ]);
 
   useEffect(() => {
     // Fetch top 3 featured stores
@@ -59,6 +62,24 @@ export default function Home() {
       .limit(3)
       .then(({ data }) => {
         if (data) setTopWorkers(data);
+      });
+
+    // load categories
+    supabase
+      .from("store_categories")
+      .select("id,name")
+      .order("name", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Could not load categories", error);
+          return;
+        }
+        if (data) {
+          setCategories([
+            { id: "all", name: "Бүгд" },
+            ...data.map((d: any) => ({ id: String(d.id), name: d.name })),
+          ]);
+        }
       });
   }, []);
 
@@ -94,7 +115,12 @@ export default function Home() {
         {/* Location */}
         <div className="mt-3 flex items-center gap-1 text-white/80">
           <MapPin className="w-4 h-4" />
-          <span className="text-sm">Улаанбаатар, Хан-Уул дүүрэг</span>
+          <span className="text-sm">
+            {" "}
+            {user?.user_metadata?.name ||
+              user?.email?.split("@")[0] ||
+              "Хэрэглэгч"}
+          </span>
         </div>
       </header>
 
@@ -137,8 +163,8 @@ export default function Home() {
           {categories.map((category) => (
             <CategoryPill
               key={category.id}
-              label={category.label}
-              icon={category.icon}
+              label={category.name}
+              icon={MapPin}
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />
