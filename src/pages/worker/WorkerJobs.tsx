@@ -1,4 +1,5 @@
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,6 +18,9 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface Job {
   id: string;
@@ -24,71 +28,15 @@ interface Job {
   customerAvatar: string;
   title: string;
   description: string;
-  location: string;
+  location?: string;
   status: "new" | "quoted" | "accepted" | "in_progress" | "completed";
   expectedBudget: number;
   quotedPrice?: number;
   createdAt: Date;
-  scheduledDate?: Date;
+  scheduledDate?: Date | null;
 }
 
-const mockJobs: Job[] = [
-  {
-    id: "1",
-    customerName: "Батболд Д.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
-    title: "Гэрийн цахилгааны засвар",
-    description:
-      "Угаалгын өрөөний залгуур ажиллахгүй байна, гэрэлтүүлэг шалгах",
-    location: "Хан-Уул дүүрэг, 15-р хороо",
-    status: "new",
-    expectedBudget: 150000,
-    createdAt: new Date("2024-01-16"),
-  },
-  {
-    id: "2",
-    customerName: "Оюунтөгс Б.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-    title: "Гал тогооны цахилгаан",
-    description: "Халуун хоолны залгуур суулгах, гэрлийн шугам татах",
-    location: "Баянзүрх дүүрэг, 3-р хороо",
-    status: "quoted",
-    expectedBudget: 200000,
-    quotedPrice: 180000,
-    createdAt: new Date("2024-01-15"),
-  },
-  {
-    id: "3",
-    customerName: "Энхбаяр Г.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face",
-    title: "Байшингийн утас шинэчлэх",
-    description: "2 өрөө байрны цахилгааны утас бүхэлд нь шинэчлэх",
-    location: "Сүхбаатар дүүрэг, 1-р хороо",
-    status: "accepted",
-    expectedBudget: 500000,
-    quotedPrice: 450000,
-    createdAt: new Date("2024-01-14"),
-    scheduledDate: new Date("2024-01-20"),
-  },
-  {
-    id: "4",
-    customerName: "Мөнхжин С.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-    title: "LED гэрэлтүүлэг",
-    description: "Зочны өрөөнд LED гэрэлтүүлэг суурилуулах",
-    location: "Чингэлтэй дүүрэг, 7-р хороо",
-    status: "in_progress",
-    expectedBudget: 120000,
-    quotedPrice: 100000,
-    createdAt: new Date("2024-01-13"),
-    scheduledDate: new Date("2024-01-17"),
-  },
-];
-
+// We'll fetch jobs from `orders` (type = 'service') and map to the UI model.
 const statusConfig = {
   new: { label: "Шинэ", color: "bg-primary", textColor: "text-primary" },
   quoted: {
@@ -117,9 +65,12 @@ type FilterType = "all" | "new" | "active" | "completed";
 
 export default function WorkerJobs() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredJobs = mockJobs.filter((job) => {
+  const filteredJobs = jobs.filter((job) => {
     if (activeFilter === "all") return true;
     if (activeFilter === "new") return job.status === "new";
     if (activeFilter === "active")
@@ -128,10 +79,54 @@ export default function WorkerJobs() {
     return true;
   });
 
-  const newJobsCount = mockJobs.filter((j) => j.status === "new").length;
-  const activeJobsCount = mockJobs.filter((j) =>
+  const newJobsCount = jobs.filter((j) => j.status === "new").length;
+  const activeJobsCount = jobs.filter((j) =>
     ["quoted", "accepted", "in_progress"].includes(j.status),
   ).length;
+
+  useEffect(() => {
+    async function loadJobs() {
+      setLoading(true);
+      try {
+        // Fetch service type orders. We include the user's profile for display.
+        const { data } = (await supabase
+          .from("orders")
+          .select(
+            `id, description, expected_price, agreed_price, total_amount, status, scheduled_date, created_at, user:profiles(id, name, avatar)`,
+          )
+          .eq("type", "service")) as any;
+
+        const mapped: Job[] = (data ?? []).map((row: any) => ({
+          id: row.id,
+          customerName: row.user?.name ?? "-",
+          customerAvatar:
+            row.user?.avatar ??
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face",
+          title: row.description?.split("\n")?.[0] ?? "Үйлчилгээ",
+          description: row.description ?? "",
+          location: undefined,
+          status:
+            row.status === "pending" || row.status === "negotiating"
+              ? "new"
+              : ((row.status as any) ?? "new"),
+          expectedBudget: row.expected_price ?? 0,
+          quotedPrice: row.agreed_price ?? undefined,
+          createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+          scheduledDate: row.scheduled_date
+            ? new Date(row.scheduled_date)
+            : null,
+        }));
+
+        setJobs(mapped);
+      } catch (err) {
+        console.error("Failed to load worker jobs:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadJobs();
+  }, [profile]);
 
   return (
     <AppLayout>
@@ -152,13 +147,13 @@ export default function WorkerJobs() {
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
               <span className="text-2xl font-bold text-white">
-                {newJobsCount}
+                {loading ? "—" : newJobsCount}
               </span>
               <p className="text-xs text-white/70 mt-1">Шинэ</p>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
               <span className="text-2xl font-bold text-white">
-                {activeJobsCount}
+                {loading ? "—" : activeJobsCount}
               </span>
               <p className="text-xs text-white/70 mt-1">Идэвхтэй</p>
             </div>
@@ -237,7 +232,9 @@ export default function WorkerJobs() {
                 {/* Location */}
                 <div className="mt-3 flex items-center gap-2 text-muted-foreground">
                   <MapPin className="w-4 h-4" />
-                  <span className="text-sm truncate">{job.location}</span>
+                  <span className="text-sm truncate">
+                    {job.location ?? "-"}
+                  </span>
                 </div>
 
                 {/* Price */}
@@ -303,13 +300,19 @@ export default function WorkerJobs() {
           })}
         </div>
 
-        {filteredJobs.length === 0 && (
+        {filteredJobs.length === 0 && !loading && (
           <div className="text-center py-12">
             <Briefcase className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="font-semibold text-foreground">Ажил байхгүй</h3>
             <p className="text-muted-foreground text-sm mt-1">
               Одоогоор ажил ирээгүй байна
             </p>
+          </div>
+        )}
+
+        {loading && (
+          <div className="text-center py-12 text-muted-foreground">
+            Уншиж байна...
           </div>
         )}
       </section>

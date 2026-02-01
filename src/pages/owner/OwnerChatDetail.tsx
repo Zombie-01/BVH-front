@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   ArrowLeft,
   Send,
@@ -31,6 +33,9 @@ interface ChatData {
   items: OrderItem[];
   expectedPrice?: number | null;
   status: "negotiating" | "agreed" | "completed";
+  storeId?: string | null;
+  type?: "store" | "service" | "driver";
+  orderId?: string | null;
 }
 
 export default function OwnerChatDetail() {
@@ -44,20 +49,36 @@ export default function OwnerChatDetail() {
   // Map convenience name
   const chatData = chatDataState;
 
-  // upload helper for chat media
+  // upload helper for chat media (public URL first, signed URL fallback)
   const uploadToStorage = async (file: File, folder: string) => {
     const path = `${folder}/${Date.now()}_${file.name}`;
-    const { data, error } = await supabase.storage
-      .from("chat-media")
+    const { error } = await supabase.storage
+      .from("chat-images")
       .upload(path, file, { upsert: true });
     if (error) throw error;
-    const urlRes = supabase.storage.from("chat-media").getPublicUrl(path);
-    return urlRes.data?.publicUrl ?? null;
+
+    // prefer public URL (common for public buckets)
+    const urlRes = supabase.storage.from("chat-images").getPublicUrl(path);
+    if (urlRes.data?.publicUrl) return urlRes.data.publicUrl;
+
+    // fallback to a short-lived signed URL for private buckets
+    try {
+      const signed = await supabase.storage
+        .from("chat-images")
+        .createSignedUrl(path, 60 * 60);
+      if (signed.data?.signedUrl) return signed.data.signedUrl;
+    } catch (err) {
+      /* fallthrough */
+    }
+
+    throw new Error(
+      "Could not obtain a public or signed URL for uploaded file",
+    );
   };
 
   // load chat and messages, subscribe to new messages
   useEffect(() => {
-    let channel: never | null = null;
+    let channel: RealtimeChannel | null = null;
     async function load() {
       if (!id) return;
       // load chat
@@ -88,6 +109,9 @@ export default function OwnerChatDetail() {
           items: [],
           expectedPrice: chatRow.expected_price ?? null,
           status: chatRow.status as any,
+          storeId: chatRow.store_id ?? null,
+          type: chatRow.type ?? undefined,
+          orderId: chatRow.order_id ?? null,
         });
       }
 
@@ -139,21 +163,22 @@ export default function OwnerChatDetail() {
           },
           (payload: any) => {
             const m = payload.new;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: m.id,
-                chatId: m.chat_id,
-                senderId: m.sender_id,
-                senderRole: m.sender_role,
-                content: m.content ?? "",
-                imageUrl: m.image_url ?? undefined,
-                createdAt: m.created_at ? new Date(m.created_at) : new Date(),
-                read: !!m.read,
-                messageType: m.message_type as any,
-                dealAmount: m.deal_amount ?? undefined,
-              } as ChatMessage,
-            ]);
+            const mapped: ChatMessage = {
+              id: m.id,
+              chatId: m.chat_id,
+              senderId: m.sender_id,
+              senderRole: m.sender_role,
+              content: m.content ?? "",
+              imageUrl: m.image_url ?? undefined,
+              createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+              read: !!m.read,
+              messageType: m.message_type as any,
+              dealAmount: m.deal_amount ?? undefined,
+            };
+
+            setMessages((prev) =>
+              prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+            );
           },
         )
         .subscribe();
@@ -163,7 +188,6 @@ export default function OwnerChatDetail() {
     return () => {
       if (channel) channel.unsubscribe?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // chatData is loaded from DB into state above
@@ -211,11 +235,9 @@ export default function OwnerChatDetail() {
         deal_amount: price,
       } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-      const { data } = (await supabase
+      const { data } = (await (supabase as any)
         .from("chat_messages")
-        .insert(
-          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
-        )
+        .insert(payload as any)
         .select()
         .maybeSingle()) as {
         data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
@@ -230,13 +252,59 @@ export default function OwnerChatDetail() {
             createdAt: data.created_at ? new Date(data.created_at) : new Date(),
           } as any,
         ]);
+
+        // update chat last message
         await (supabase as any)
           .from("chats")
           .update({
             last_message: payload.content,
             updated_at: new Date().toISOString(),
+            status: "agreed",
+            agreed_price: price,
           } as Database["public"]["Tables"]["chats"]["Update"])
           .eq("id", id);
+
+        // create an order if none exists for this chat
+        try {
+          if (chatData?.orderId) return; // already has order
+          const orderPayload = {
+            user_id: chatData?.customer.id ?? null,
+            store_id: chatData?.storeId ?? null,
+            chat_id: id,
+            type: chatData?.type === "service" ? "service" : "delivery",
+            status: "confirmed",
+            expected_price: chatData?.expectedPrice ?? price,
+            agreed_price: price,
+            total_amount: price,
+          } as unknown as Database["public"]["Tables"]["orders"]["Insert"];
+
+          const { data: orderData } = (await (supabase as any)
+            .from("orders")
+            .insert(orderPayload as any)
+            .select()
+            .maybeSingle()) as {
+            data: Database["public"]["Tables"]["orders"]["Row"] | null;
+            error: any;
+          };
+
+          if (orderData) {
+            // link order to chat
+            await (supabase as any)
+              .from("chats")
+              .update({
+                order_id: orderData.id,
+                updated_at: new Date().toISOString(),
+              } as Database["public"]["Tables"]["chats"]["Update"])
+              .eq("id", id);
+
+            // update local state
+            setChatDataState((prev) =>
+              prev ? { ...prev, orderId: orderData.id } : prev,
+            );
+          }
+        } catch (err) {
+          console.error("Failed to create order after agreement:", err);
+        }
       }
     } catch (err) {
       console.error("Accept price failed:", err);
@@ -256,11 +324,9 @@ export default function OwnerChatDetail() {
         message_type: "deal_rejected",
       } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-      const { data } = (await supabase
+      const { data } = (await (supabase as any)
         .from("chat_messages")
-        .insert(
-          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
-        )
+        .insert(payload as any)
         .select()
         .maybeSingle()) as {
         data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
@@ -298,11 +364,9 @@ export default function OwnerChatDetail() {
         deal_amount: price,
       } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-      const { data } = (await supabase
+      const { data } = (await (supabase as any)
         .from("chat_messages")
-        .insert(
-          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
-        )
+        .insert(payload as any)
         .select()
         .maybeSingle()) as {
         data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
@@ -332,9 +396,9 @@ export default function OwnerChatDetail() {
             message_type: "price_proposal",
             deal_amount: userCounter,
           } as any;
-          const res = await supabase
+          const res = await (supabase as any)
             .from("chat_messages")
-            .insert(counterPayload)
+            .insert(counterPayload as any)
             .select()
             .maybeSingle();
           if (res.data)
@@ -367,11 +431,9 @@ export default function OwnerChatDetail() {
       } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
       // insert message
-      const { data } = (await supabase
+      const { data } = (await (supabase as any)
         .from("chat_messages")
-        .insert(
-          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
-        )
+        .insert(payload as any)
         .select()
         .maybeSingle()) as {
         data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
@@ -415,11 +477,9 @@ export default function OwnerChatDetail() {
         message_type: "image",
       } as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"];
 
-      const { data } = (await supabase
+      const { data } = (await (supabase as any)
         .from("chat_messages")
-        .insert(
-          payload as Database["public"]["Tables"]["chat_messages"]["Insert"],
-        )
+        .insert(payload as any)
         .select()
         .maybeSingle()) as {
         data: Database["public"]["Tables"]["chat_messages"]["Row"] | null;
@@ -435,12 +495,12 @@ export default function OwnerChatDetail() {
         ]);
 
       // update chat last message
-      await supabase
+      await (supabase as any)
         .from("chats")
         .update({
           last_message: payload.content,
           updated_at: new Date().toISOString(),
-        } as Database["public"]["Tables"]["chats"]["Update"])
+        } as any)
         .eq("id", id);
     } catch (err) {
       console.error("Image upload failed:", err);
@@ -649,72 +709,74 @@ export default function OwnerChatDetail() {
             );
           })}
 
-          {/* Price Proposal Action Card */}
-          {pendingProposal && chatStatus === "negotiating" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-primary/10 border-2 border-primary rounded-2xl p-4 my-4">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-5 h-5 text-primary" />
-                <span className="font-semibold text-foreground">
-                  Хэрэглэгчийн үнийн санал
-                </span>
-              </div>
-
-              <p className="text-2xl font-bold text-primary mb-4">
-                {pendingProposal?.toLocaleString()}₮
-              </p>
-
-              {!showCounterInput ? (
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={() => handleAcceptPrice(pendingProposal)}>
-                    <Check className="w-4 h-4 mr-2" />
-                    Зөвшөөрөх
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCounterInput(true)}>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Өөрчлөх
-                  </Button>
-                  <Button variant="ghost" onClick={handleRejectPrice}>
-                    <X className="w-4 h-4" />
-                  </Button>
+          {/* Price Proposal Action Card (hidden if an order exists) */}
+          {pendingProposal &&
+            chatStatus === "negotiating" &&
+            !chatData?.orderId && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-primary/10 border-2 border-primary rounded-2xl p-4 my-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                  <span className="font-semibold text-foreground">
+                    Хэрэглэгчийн үнийн санал
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-3">
+
+                <p className="text-2xl font-bold text-primary mb-4">
+                  {pendingProposal?.toLocaleString()}₮
+                </p>
+
+                {!showCounterInput ? (
                   <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={counterPrice}
-                      onChange={(e) =>
-                        setCounterPrice(e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                      placeholder="Шинэ үнэ оруулах"
+                    <Button
                       className="flex-1"
-                    />
-                    <span className="flex items-center text-muted-foreground">
-                      ₮
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button className="flex-1" onClick={handleCounterOffer}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Санал илгээх
+                      onClick={() => handleAcceptPrice(pendingProposal)}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Зөвшөөрөх
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => setShowCounterInput(false)}>
-                      Болих
+                      onClick={() => setShowCounterInput(true)}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Өөрчлөх
+                    </Button>
+                    <Button variant="ghost" onClick={handleRejectPrice}>
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={counterPrice}
+                        onChange={(e) =>
+                          setCounterPrice(e.target.value.replace(/[^0-9]/g, ""))
+                        }
+                        placeholder="Шинэ үнэ оруулах"
+                        className="flex-1"
+                      />
+                      <span className="flex items-center text-muted-foreground">
+                        ₮
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={handleCounterOffer}>
+                        <Send className="w-4 h-4 mr-2" />
+                        Санал илгээх
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCounterInput(false)}>
+                        Болих
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
           {/* Deal Confirmed */}
           {chatStatus === "agreed" && agreedPrice && (
@@ -741,39 +803,56 @@ export default function OwnerChatDetail() {
 
         {/* Input */}
         <div className="bg-card border-t border-border p-4 safe-area-bottom">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-              <Camera className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-              <Image className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <Input
-              placeholder="Мессеж бичих..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1"
-            />
-            <Button
-              size="icon"
-              onClick={handleSend}
-              disabled={!newMessage.trim()}
-              className="flex-shrink-0">
-              <Send className="w-5 h-5" />
-            </Button>
-          </div>
+          {chatData?.orderId ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-foreground">
+                Захиалга{" "}
+                <span className="font-medium">#{chatData.orderId}</span> үүссэн
+                тул чат хаагдсан.
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={() => navigate(`/orders/${chatData.orderId}`)}>
+                  Захиалгыг үзэх
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                  <Camera className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                  <Image className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <Input
+                  placeholder="Мессеж бичих..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  className="flex-1"
+                />
+                <Button
+                  size="icon"
+                  onClick={handleSend}
+                  disabled={!newMessage.trim()}
+                  className="flex-shrink-0">
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </AppLayout>

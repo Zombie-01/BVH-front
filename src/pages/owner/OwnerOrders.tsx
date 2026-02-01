@@ -304,12 +304,6 @@ export default function OwnerOrders() {
     handleUpdateStatus(orderId, "confirmed");
   };
 
-  const handleQuickAssign = (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedOrder(orders.find((o) => o.id === orderId) || null);
-    setDetailModalOpen(true);
-  };
-
   // listen for manual reload event (used after create)
   useEffect(() => {
     const onReload = () => {
@@ -491,14 +485,7 @@ export default function OwnerOrders() {
                       <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   )}
-                  {order.status === "confirmed" && !order.driver && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => handleQuickAssign(order.id, e)}>
-                      Жолооч оноох
-                      <Truck className="w-4 h-4 ml-1" />
-                    </Button>
-                  )}
+                
                 </div>
               </motion.div>
             );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { mockProducts, mockStores } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import type { Product as ProductType, Store } from "@/types";
 
 const ProductDetail = () => {
   const { storeId, productId } = useParams();
@@ -21,12 +23,74 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const product = mockProducts.find(
-    (p) => p.id === productId && p.storeId === storeId,
-  );
-  const store = mockStores.find((s) => s.id === storeId);
+  const [product, setProduct] = useState<ProductType | null>(null);
+  const [store, setStore] = useState<Store | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (!product || !store) {
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!productId || !storeId) return;
+      setLoading(true);
+
+      const { data: prodRows } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", productId)
+        .limit(1);
+      const p = (prodRows && prodRows[0]) as
+        | Database["public"]["Tables"]["products"]["Row"]
+        | undefined;
+      if (p && mounted) {
+        setProduct({
+          id: p.id,
+          storeId: p.store_id,
+          name: p.name,
+          description: p.description ?? "",
+          price: p.price,
+          unit: p.unit ?? "",
+          image: p.image ?? "",
+          category: p.category ?? "",
+          inStock: p.in_stock,
+          specifications: Array.isArray(p.specifications)
+            ? (p.specifications as unknown as ProductType["specifications"])
+            : undefined,
+        });
+      }
+
+      const { data: storeRows } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", storeId)
+        .limit(1);
+      const s = (storeRows && storeRows[0]) as
+        | Database["public"]["Tables"]["stores"]["Row"]
+        | undefined;
+      if (s && mounted) {
+        setStore({
+          id: s.id,
+          name: s.name,
+          description: s.description ?? "",
+          image: s.image ?? "",
+          rating: s.rating ?? 0,
+          reviewCount: s.review_count ?? 0,
+          category: (s.categories && s.categories[0]) || "other",
+          location: s.location ?? "",
+          isOpen: s.is_open,
+          phone: s.phone ?? undefined,
+        });
+      }
+
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [productId, storeId]);
+
+  if (!product && !loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Бүтээгдэхүүн олдсонгүй</p>
@@ -34,22 +98,22 @@ const ProductDetail = () => {
     );
   }
 
-  const totalPrice = product.price * quantity;
+  const totalPrice = product ? product?.price * quantity : 0;
 
   const handleAddToCart = () => {
-    // Navigate to chat with product info
-    navigate(`/chat/new-${store.id}`, {
+    if (!product || !store) return;
+    navigate(`/chat/new-${store?.id}`, {
       state: {
         type: "store",
-        name: store.name,
-        storeId: store.id,
+        name: store?.name,
+        storeId: store?.id,
         items: [
           {
-            productId: product.id,
-            productName: product.name,
+            productId: product?.id,
+            productName: product?.name,
             quantity: quantity,
-            price: product.price,
-            image: product.image,
+            price: product?.price,
+            image: product?.image,
           },
         ],
         expectedPrice: totalPrice,
@@ -64,8 +128,8 @@ const ProductDetail = () => {
           {/* Left - Image */}
           <div className="relative h-72 md:h-96 lg:h-[500px] bg-muted lg:rounded-2xl lg:overflow-hidden">
             <img
-              src={product.image}
-              alt={product.name}
+              src={product?.image}
+              alt={product?.name}
               className="w-full h-full object-cover"
             />
 
@@ -94,8 +158,8 @@ const ProductDetail = () => {
 
             {/* Stock Badge */}
             <div className="absolute bottom-4 left-4">
-              <Badge variant={product.inStock ? "default" : "destructive"}>
-                {product.inStock ? "Нөөцөд байгаа" : "Дууссан"}
+              <Badge variant={product?.inStock ? "default" : "destructive"}>
+                {product?.inStock ? "Нөөцөд байгаа" : "Дууссан"}
               </Badge>
             </div>
           </div>
@@ -111,10 +175,10 @@ const ProductDetail = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <Badge variant="secondary" className="mb-2">
-                      {product.category}
+                      {product?.category}
                     </Badge>
                     <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">
-                      {product.name}
+                      {product?.name}
                     </h1>
                   </div>
                 </div>
@@ -122,10 +186,10 @@ const ProductDetail = () => {
                 <div className="flex items-center justify-between mt-3">
                   <div>
                     <span className="text-2xl md:text-3xl font-bold text-primary">
-                      {product.price?.toLocaleString()}₮
+                      {product?.price?.toLocaleString()}₮
                     </span>
                     <span className="text-sm text-muted-foreground ml-1">
-                      /{product.unit}
+                      /{product?.unit}
                     </span>
                   </div>
                 </div>
@@ -139,21 +203,21 @@ const ProductDetail = () => {
               transition={{ delay: 0.1 }}
               className="px-4 lg:px-0 mt-4">
               <button
-                onClick={() => navigate(`/stores/${store.id}`)}
+                onClick={() => navigate(`/stores/${store?.id}`)}
                 className="w-full bg-card rounded-xl p-3 md:p-4 border border-border flex items-center gap-3 hover:bg-muted transition-colors">
                 <img
-                  src={store.image}
-                  alt={store.name}
+                  src={store?.image}
+                  alt={store?.name}
                   className="w-12 h-12 md:w-14 md:h-14 rounded-lg object-cover"
                 />
                 <div className="flex-1 text-left">
                   <h3 className="font-semibold text-foreground">
-                    {store.name}
+                    {store?.name}
                   </h3>
                   <div className="flex items-center gap-1 mt-0.5">
                     <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
                     <span className="text-sm text-muted-foreground">
-                      {store.rating} • {store.location}
+                      {store?.rating} • {store?.location}
                     </span>
                   </div>
                 </div>
@@ -169,12 +233,12 @@ const ProductDetail = () => {
               className="px-4 lg:px-0 mt-4">
               <h2 className="font-bold text-foreground mb-2">Тайлбар</h2>
               <p className="text-muted-foreground text-sm md:text-base">
-                {product.description}
+                {product?.description}
               </p>
             </motion.div>
 
             {/* Specifications */}
-            {product.specifications && product.specifications.length > 0 && (
+            {product?.specifications && product?.specifications.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -184,11 +248,11 @@ const ProductDetail = () => {
                   Техникийн үзүүлэлт
                 </h2>
                 <div className="bg-card rounded-xl border border-border overflow-hidden">
-                  {product.specifications.map((spec, index) => (
+                  {product?.specifications.map((spec, index) => (
                     <div
                       key={index}
                       className={`flex items-center justify-between p-3 md:p-4 ${
-                        index < product.specifications!.length - 1
+                        index < product?.specifications!.length - 1
                           ? "border-b border-border"
                           : ""
                       }`}>
@@ -237,7 +301,7 @@ const ProductDetail = () => {
                 <Button
                   className="w-full"
                   size="lg"
-                  disabled={!product.inStock}
+                  disabled={!product?.inStock}
                   onClick={handleAddToCart}>
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   Захиалга өгөх
@@ -279,7 +343,7 @@ const ProductDetail = () => {
         <Button
           className="w-full"
           size="lg"
-          disabled={!product.inStock}
+          disabled={!product?.inStock}
           onClick={handleAddToCart}>
           <ShoppingCart className="w-5 h-5 mr-2" />
           Захиалга өгөх

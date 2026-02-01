@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   ArrowLeft,
   Send,
@@ -21,10 +23,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ServiceRequest {
   id: string;
-  customer: { name: string; avatar: string };
+  customer: { name: string; avatar: string; id?: string | null };
   description: string;
   expectedPrice: number;
   status: "negotiating" | "agreed" | "completed";
@@ -69,18 +73,143 @@ const initialMessages: ChatMessage[] = [
 export default function WorkerChatDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, profile } = useAuth();
 
-  const [serviceRequest] = useState<ServiceRequest>(mockServiceRequest);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [serviceRequest, setServiceRequest] = useState<ServiceRequest | null>(
+    null,
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [showServiceHeader, setShowServiceHeader] = useState(true);
   const [chatStatus, setChatStatus] = useState<
     "negotiating" | "agreed" | "completed"
-  >(serviceRequest.status);
+  >("negotiating");
   const [agreedPrice, setAgreedPrice] = useState<number | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<number | null>(150000);
+  const [pendingProposal, setPendingProposal] = useState<number | null>(null);
   const [showCounterInput, setShowCounterInput] = useState(false);
   const [counterPrice, setCounterPrice] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      if (!id) return;
+      // Try to load order (job)
+      try {
+        const { data: order } = (await supabase
+          .from("orders")
+          .select("*, user:profiles(id, name, avatar)")
+          .eq("id", id)
+          .maybeSingle()) as any;
+
+        if (order) {
+          setServiceRequest({
+            id: order.id,
+            customer: {
+              id: order.user?.id ?? null,
+              name: order.user?.name ?? null,
+              avatar: order.user?.avatar ?? null,
+            },
+            description: order.description ?? "",
+            expectedPrice: order.expected_price ?? 0,
+            status: order.status ?? "negotiating",
+          });
+          setChatStatus(order.status ?? "negotiating");
+          setPendingProposal(order.expected_price ?? null);
+        } else if (
+          location.state &&
+          (location.state as any).serviceDescription
+        ) {
+          // Fallback to location state if navigation provided it
+          const s = location.state as any;
+          setServiceRequest({
+            id: id as string,
+            customer: { name: s.name ?? null, avatar: null },
+            description: s.serviceDescription ?? "",
+            expectedPrice: s.expectedPrice ?? 0,
+            status: "negotiating",
+          });
+          setPendingProposal(s.expectedPrice ?? null);
+        }
+
+        // Find a chat linked to this order
+        const { data: chatRow } = await supabase
+          .from("chats")
+          .select("*")
+          .eq("order_id", id)
+          .maybeSingle();
+
+        if ((chatRow && chatRow?.data) ?? chatRow) {
+          const row = (chatRow as any).data ?? chatRow;
+          setChatId(row.id);
+          // load messages
+          const { data: msgs } = await supabase
+            .from("chat_messages")
+            .select("*")
+            .eq("chat_id", row.id)
+            .order("created_at", { ascending: true });
+          const mapped = (msgs ?? []).map((m: any) => ({
+            id: m.id,
+            chatId: m.chat_id,
+            senderId: m.sender_id,
+            senderRole: m.sender_role,
+            content: m.content ?? "",
+            imageUrl: m.image_url ?? undefined,
+            createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+            read: !!m.read,
+            messageType: m.message_type as any,
+            dealAmount: m.deal_amount ?? undefined,
+          })) as ChatMessage[];
+          setMessages(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load worker chat detail:", err);
+      }
+    }
+
+    load();
+  }, [id, location.state]);
+
+  // realtime subscription for incoming messages (deduped)
+  useEffect(() => {
+    let channel: RealtimeChannel | null = null;
+    if (!chatId) return;
+
+    channel = supabase
+      .channel(`chat-${chatId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `chat_id=eq.${chatId}`,
+        },
+        (payload: any) => {
+          const m = payload.new;
+          const mapped: ChatMessage = {
+            id: m.id,
+            chatId: m.chat_id,
+            senderId: m.sender_id,
+            senderRole: m.sender_role,
+            content: m.content ?? "",
+            imageUrl: m.image_url ?? undefined,
+            createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+            read: !!m.read,
+            messageType: m.message_type as any,
+            dealAmount: m.deal_amount ?? undefined,
+          };
+          setMessages((prev) =>
+            prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) channel.unsubscribe?.();
+    };
+  }, [chatId]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,42 +222,116 @@ export default function WorkerChatDetail() {
     scrollToBottom();
   }, [messages]);
 
-  const handleAcceptPrice = (price: number) => {
+  const ensureChatExists = async () => {
+    if (chatId) return chatId;
+    if (!serviceRequest) return null;
+
+    // create a chat row linking to the order
+    try {
+      const payload = {
+        user_id: serviceRequest.customer.id ?? null,
+        worker_id: profile?.id ?? null,
+        order_id: serviceRequest.id,
+        type: "service",
+        status: "negotiating",
+        last_message: null,
+      } as any;
+
+      const { data } = (await (supabase as any)
+        .from("chats")
+        .insert(payload)
+        .select()
+        .maybeSingle()) as any;
+
+      if (data) {
+        setChatId(data.id);
+        return data.id;
+      }
+    } catch (err) {
+      console.error("Failed to create chat:", err);
+    }
+    return null;
+  };
+
+  const insertMessage = async (messagePayload: any) => {
+    try {
+      const idToUse = await ensureChatExists();
+      if (!idToUse) return null;
+      const payload = { ...messagePayload, chat_id: idToUse };
+      const { data } = (await (supabase as any)
+        .from("chat_messages")
+        .insert(payload as any)
+        .select()
+        .maybeSingle()) as any;
+      if (data) {
+        const mapped: ChatMessage = {
+          id: data.id,
+          chatId: data.chat_id,
+          senderId: data.sender_id,
+          senderRole: data.sender_role,
+          content: data.content ?? "",
+          imageUrl: data.image_url ?? undefined,
+          createdAt: data.created_at ? new Date(data.created_at) : new Date(),
+          read: !!data.read,
+          messageType: data.message_type as any,
+          dealAmount: data.deal_amount ?? undefined,
+        };
+
+        setMessages((prev) =>
+          prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+        );
+
+        // update chat last_message
+        await (supabase as any)
+          .from("chats")
+          .update({ last_message: mapped.content } as any)
+          .eq("id", idToUse);
+
+        return mapped;
+      }
+    } catch (err) {
+      console.error("Insert message failed:", err);
+    }
+    return null;
+  };
+
+  const handleAcceptPrice = async (price: number) => {
     setAgreedPrice(price);
     setChatStatus("agreed");
     setPendingProposal(null);
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "worker-1",
-      senderRole: "worker",
+    await insertMessage({
+      sender_id: profile?.id ?? user?.id,
+      sender_role: "worker",
       content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "deal_accepted",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
+      message_type: "deal_accepted",
+      deal_amount: price,
+    });
+
+    // Optionally create or update order status as confirmed
+    if (serviceRequest) {
+      try {
+        await (supabase as any)
+          .from("orders")
+          .update({ status: "confirmed", agreed_price: price } as any)
+          .eq("id", serviceRequest.id);
+      } catch (err) {
+        console.error("Failed to update order status:", err);
+      }
+    }
   };
 
-  const handleRejectPrice = () => {
+  const handleRejectPrice = async () => {
     setPendingProposal(null);
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "worker-1",
-      senderRole: "worker",
+    await insertMessage({
+      sender_id: profile?.id ?? user?.id,
+      sender_role: "worker",
       content: "Уучлаарай, энэ үнэ тохирохгүй байна",
-      createdAt: new Date(),
-      read: false,
-      messageType: "deal_rejected",
-    };
-    setMessages((prev) => [...prev, message]);
+      message_type: "deal_rejected",
+    });
   };
 
-  const handleCounterOffer = () => {
+  const handleCounterOffer = async () => {
     const price = parseInt(counterPrice.replace(/,/g, ""));
     if (price <= 0) return;
 
@@ -136,79 +339,58 @@ export default function WorkerChatDetail() {
     setShowCounterInput(false);
     setCounterPrice("");
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "worker-1",
-      senderRole: "worker",
+    await insertMessage({
+      sender_id: profile?.id ?? user?.id,
+      sender_role: "worker",
       content: `${price?.toLocaleString()}₮ санал болгож байна`,
-      createdAt: new Date(),
-      read: false,
-      messageType: "price_proposal",
-      dealAmount: price,
-    };
-    setMessages((prev) => [...prev, message]);
-
-    // Simulate user response
-    setTimeout(() => {
-      if (Math.random() > 0.5) {
-        handleAcceptPrice(price);
-      } else {
-        const userCounter = Math.round(price * 0.92);
-        setPendingProposal(userCounter);
-        const counterMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          chatId: id || "1",
-          senderId: "user-1",
-          senderRole: "user",
-          content: `${userCounter?.toLocaleString()}₮ санал болгож байна`,
-          createdAt: new Date(),
-          read: true,
-          messageType: "price_proposal",
-          dealAmount: userCounter,
-        };
-        setMessages((prev) => [...prev, counterMessage]);
-      }
-    }, 1500);
+      message_type: "price_proposal",
+      deal_amount: price,
+    });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newMessage.trim()) return;
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      chatId: id || "1",
-      senderId: "worker-1",
-      senderRole: "worker",
+    await insertMessage({
+      sender_id: profile?.id ?? user?.id,
+      sender_role: "worker",
       content: newMessage.trim(),
-      createdAt: new Date(),
-      read: false,
-      messageType: "text",
-    };
-
-    setMessages((prev) => [...prev, message]);
+      message_type: "text",
+    });
     setNewMessage("");
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const message: ChatMessage = {
-          id: Date.now().toString(),
-          chatId: id || "1",
-          senderId: "worker-1",
-          senderRole: "worker",
-          content: "Зураг илгээлээ",
-          imageUrl: reader.result as string,
-          createdAt: new Date(),
-          read: false,
-          messageType: "image",
-        };
-        setMessages((prev) => [...prev, message]);
-      };
-      reader.readAsDataURL(file);
+    // allow re-selecting same file later
+    e.currentTarget.value = "";
+    if (!file) return;
+
+    // upload to chat-images bucket (public url preferred, signed-url fallback)
+    const path = `${chatId ?? "unknown"}/${Date.now()}_${file.name}`;
+    try {
+      const { error } = await supabase.storage
+        .from("chat-images")
+        .upload(path, file, { upsert: true });
+      if (error) throw error;
+
+      const urlRes = supabase.storage.from("chat-images").getPublicUrl(path);
+      let publicUrl = urlRes.data?.publicUrl ?? null;
+      if (!publicUrl) {
+        const signed = await supabase.storage
+          .from("chat-images")
+          .createSignedUrl(path, 60 * 60);
+        publicUrl = signed.data?.signedUrl ?? null;
+      }
+
+      await insertMessage({
+        sender_id: profile?.id ?? user?.id,
+        sender_role: "worker",
+        content: "Зураг илгээлээ",
+        image_url: publicUrl,
+        message_type: "image",
+      });
+    } catch (err) {
+      console.error("Image upload failed:", err);
     }
   };
 
@@ -254,8 +436,8 @@ export default function WorkerChatDetail() {
                 ? "bg-primary/20 border-2 border-primary rounded-br-md"
                 : "bg-primary text-primary-foreground rounded-br-md"
               : message.messageType === "price_proposal"
-              ? "bg-card border-2 border-primary rounded-bl-md"
-              : "bg-card border border-border rounded-bl-md"
+                ? "bg-card border-2 border-primary rounded-bl-md"
+                : "bg-card border border-border rounded-bl-md"
           }`}>
           {message.imageUrl && (
             <img

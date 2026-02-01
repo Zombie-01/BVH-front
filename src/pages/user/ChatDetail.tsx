@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChatMessage, OrderItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Store, ServiceWorker, Order } from "@/types";
 import { UserPriceInput } from "@/components/chat/UserPriceInput";
@@ -181,6 +182,65 @@ const ChatDetail = () => {
           }));
           setMessages(mapped as ChatMessage[]);
         }
+
+        // mark chat as read (clear unread count)
+        try {
+          await (supabase as any)
+            .from("chats")
+            .update({ unread_count: 0 })
+            .eq("id", id);
+        } catch (e) {
+          /* ignore */
+        }
+
+        // ensure we don't double-subscribe (useful during HMR/dev)
+        // if an existing channel is present for this chat id, unsubscribe it first
+        (window as any).__supabase_chat_channel =
+          (window as any).__supabase_chat_channel || {};
+        const existing = (window as any).__supabase_chat_channel[id] as
+          | RealtimeChannel
+          | undefined;
+        if (existing && typeof existing.unsubscribe === "function") {
+          try {
+            existing.unsubscribe();
+          } catch (err) {
+            /* ignore */
+          }
+        }
+
+        const _channel = supabase
+          .channel(`chat-${id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "chat_messages",
+              filter: `chat_id=eq.${id}`,
+            },
+            (payload: any) => {
+              const m = payload.new;
+              const mapped = {
+                id: m.id,
+                chatId: m.chat_id,
+                senderId: m.sender_id,
+                senderRole: m.sender_role,
+                content: m.content ?? "",
+                imageUrl: m.image_url ?? undefined,
+                createdAt: m.created_at ? new Date(m.created_at) : new Date(),
+                read: !!m.read,
+                messageType: m.message_type as ChatMessage["messageType"],
+                dealAmount: m.deal_amount ?? undefined,
+              } as ChatMessage;
+              setMessages((prev) =>
+                prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+              );
+            },
+          )
+          .subscribe();
+
+        // keep channel ref so cleanup can unsubscribe and prevent dupes in dev
+        (window as any).__supabase_chat_channel[id] = _channel;
       }
 
       setLoading(false);
@@ -188,6 +248,17 @@ const ChatDetail = () => {
     load();
     return () => {
       mounted = false;
+      try {
+        const ch = (window as any).__supabase_chat_channel?.[id] as
+          | RealtimeChannel
+          | undefined;
+        if (ch && typeof ch.unsubscribe === "function") {
+          ch.unsubscribe();
+          delete (window as any).__supabase_chat_channel?.[id];
+        }
+      } catch (err) {
+        /* ignore */
+      }
     };
   }, [id]);
 
@@ -484,7 +555,9 @@ const ChatDetail = () => {
           dealAmount: m.deal_amount ?? undefined,
         } as ChatMessage;
         setExistingChat(res.chat);
-        setMessages((prev) => [...prev, mapped]);
+        setMessages((prev) =>
+          prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+        );
       }
 
       return;
@@ -768,11 +841,25 @@ const ChatDetail = () => {
   const uploadToStorage = async (file: File, folder: string) => {
     const path = `${folder}/${Date.now()}_${file.name}`;
     const { data, error } = await supabase.storage
-      .from("chat-media")
+      .from("chat-images")
       .upload(path, file, { upsert: true });
     if (error) throw error;
-    const urlRes = supabase.storage.from("chat-media").getPublicUrl(path);
-    return urlRes.data?.publicUrl ?? null;
+
+    // Try public URL first (common for public buckets)
+    const urlRes = supabase.storage.from("chat-images").getPublicUrl(path);
+    if (urlRes.data?.publicUrl) return urlRes.data.publicUrl;
+
+    // Fallback to signed URL for private buckets (expires in 1 hour)
+    try {
+      const signed = await supabase.storage
+        .from("chat-images")
+        .createSignedUrl(path, 60 * 60);
+      if (signed.data?.signedUrl) return signed.data.signedUrl;
+    } catch (err) {
+      // ignore and throw below if no url produced
+    }
+
+    throw new Error("Could not get public or signed URL for uploaded file");
   };
 
   // Create a new chat row and send the first message. Navigates to the created chat and returns created message+chat.
@@ -934,6 +1021,8 @@ const ChatDetail = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // reset input so same file can be re-selected later
+    e.currentTarget.value = "";
     if (!file) return;
 
     if (id && !id.startsWith("new-")) {
@@ -974,7 +1063,9 @@ const ChatDetail = () => {
             messageType: inserted.message_type as ChatMessage["messageType"],
             dealAmount: inserted.deal_amount ?? undefined,
           } as ChatMessage;
-          setMessages((prev) => [...prev, mapped]);
+          setMessages((prev) =>
+            prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
+          );
         }
       } catch (err) {
         // fallback to client preview
@@ -991,7 +1082,9 @@ const ChatDetail = () => {
             read: false,
             messageType: "image",
           };
-          setMessages((prev) => [...prev, message]);
+          setMessages((prev) =>
+            prev.some((x) => x.id === message.id) ? prev : [...prev, message],
+          );
         };
         reader.readAsDataURL(file);
       }
