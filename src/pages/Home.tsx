@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -37,9 +38,9 @@ export default function Home() {
   const [topWorkers, setTopWorkers] = useState<any[]>([]);
 
   // categories from Supabase (include "all")
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([
-    { id: "all", name: "Бүгд" },
-  ]);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; icon: string }[]
+  >([{ id: "all", name: "Бүгд", icon: "" }]);
 
   useEffect(() => {
     // Fetch top 3 featured stores
@@ -67,7 +68,7 @@ export default function Home() {
     // load categories
     supabase
       .from("store_categories")
-      .select("id,name")
+      .select("id,name,icon")
       .order("name", { ascending: true })
       .then(({ data, error }) => {
         if (error) {
@@ -76,8 +77,12 @@ export default function Home() {
         }
         if (data) {
           setCategories([
-            { id: "all", name: "Бүгд" },
-            ...data.map((d: any) => ({ id: String(d.id), name: d.name })),
+            { id: "all", name: "Бүгд", icon: "" },
+            ...data.map((d: any) => ({
+              id: String(d.id),
+              name: d.name,
+              icon: d.icon,
+            })),
           ]);
         }
       });
@@ -164,7 +169,7 @@ export default function Home() {
             <CategoryPill
               key={category.id}
               label={category.name}
-              icon={MapPin}
+              icon={category.icon}
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />

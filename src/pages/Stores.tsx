@@ -19,9 +19,9 @@ export default function Stores() {
   const [loading, setLoading] = useState(false);
 
   // categories loaded from Supabase (includes an "all" entry)
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([
-    { id: "all", name: "Бүгд" },
-  ]);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; icon: string }[]
+  >([{ id: "all", name: "Бүгд", icon: "" }]);
 
   useEffect(() => {
     let mounted = true;
@@ -58,7 +58,7 @@ export default function Stores() {
     const loadCategories = async () => {
       const { data, error } = await supabase
         .from("store_categories")
-        .select("id,name")
+        .select("id,name,icon")
         .order("name", { ascending: true });
       if (!mounted) return;
       if (error) {
@@ -66,10 +66,10 @@ export default function Stores() {
         console.error("Failed to load categories", error);
         return;
       }
-      const rows = (data ?? []) as { id: string; name: string }[];
+      const rows = (data ?? []) as { id: string; name: string; icon: string }[];
       setCategories([
-        { id: "all", name: "Бүгд" },
-        ...rows.map((r) => ({ id: String(r.id), name: r.name })),
+        { id: "all", name: "Бүгд", icon: "" },
+        ...rows.map((r) => ({ id: String(r.id), name: r.name, icon: r.icon })),
       ]);
     };
     loadCategories();
@@ -132,7 +132,7 @@ export default function Stores() {
             <CategoryPill
               key={category.id}
               label={category.name}
-              icon={MapPin as any} // fallback icon — category icon not provided by DB
+              icon={category.icon} // fallback icon — category icon not provided by DB
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />
