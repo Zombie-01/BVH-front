@@ -1,0 +1,72 @@
+name: Build iOS (Capacitor)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Install iOS certificate
+        run: |
+          echo "$IOS_CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import cert.p12 -k build.keychain -P "$IOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        env:
+          IOS_CERT_P12: ${{ secrets.IOS_CERT_P12 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_PROFILE" | base64 --decode > profile.mobileprovision
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+        env:
+          IOS_PROFILE: ${{ secrets.IOS_PROFILE }}
+
+      - name: Build iOS app
+        run: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            archive
+
+      - name: Export IPA
+        run: |
+          cd ios/App
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ios/App/build/*.ipa
