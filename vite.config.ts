@@ -60,7 +60,6 @@ export default defineConfig(({ mode }) => ({
           ],
         },
       }),
-    mode === "development" && mode,
   ].filter(Boolean),
   resolve: {
     alias: {
