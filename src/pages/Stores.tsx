@@ -132,7 +132,7 @@ export default function Stores() {
             <CategoryPill
               key={category.id}
               label={category.name}
-              icon={MapPin} // fallback icon — category icon not provided by DB
+              icon={MapPin as any} // fallback icon — category icon not provided by DB
               isActive={activeCategory === category.id}
               onClick={() => setActiveCategory(category.id)}
             />
