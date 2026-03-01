@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the required API endpoints for the Construction Service Hub (Барилгын Үйлчилгээний Хаб) mobile application. The backend should support authentication, stores, products, orders, services, chat, and delivery management.
+This document outlines the required API endpoints for the Construction Service Hub (Барилгын Үйлчилгээний Хүргэлт) mobile application. The backend should support authentication, stores, products, orders, services, chat, and delivery management.
 
 ---
 

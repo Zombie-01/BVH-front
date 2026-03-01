@@ -69,8 +69,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
-
+  const { user, profile, ownerStore } = useAuth();
   const [todayRevenue, setTodayRevenue] = useState<number>(0);
   const [ordersCount, setOrdersCount] = useState<number>(0);
   const [newChatsCount, setNewChatsCount] = useState<number>(0);
@@ -236,9 +235,13 @@ export default function OwnerDashboard() {
   return (
     <AppLayout>
       {/* Header */}
-      <header className="bg-gradient-to-br from-secondary via-secondary to-gray-700 pt-safe px-4 pb-6 lg:rounded-b-3xl">
+      <header
+        style={{
+          backgroundImage: `url(${ownerStore?.image})`,
+        }}
+        className="bg-cover bg-center pt-safe px-4 pb-6 lg:rounded-b-3xl relative">
         <div className="pt-4 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
+          <div className="flex py-6 items-center justify-between">
             <div>
               <p className="text-white/80 text-sm">Сайн байна уу 🏪</p>
               <h1 className="text-2xl font-bold text-white">
@@ -263,7 +266,7 @@ export default function OwnerDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 * index }}
-                className="bg-card rounded-xl p-4 shadow-card">
+                className="bg-card rounded-xl p-4 z-10 shadow-card">
                 <div
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center mb-3",

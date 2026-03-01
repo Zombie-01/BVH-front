@@ -30,6 +30,12 @@ interface AuthContextType {
     | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  ownerStore:
+    | import("@/integrations/supabase/types").Database["public"]["Tables"]["stores"]["Row"]
+    | null;
+  serviceWorker:
+    | import("@/integrations/supabase/types").Database["public"]["Tables"]["service_workers"]["Row"]
+    | null;
   logout: () => Promise<void>;
   refreshUserRole: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -44,6 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentRole, setCurrentRole] = useState<UserRole | null>(null);
   const [profile, setProfile] = useState<
     | import("@/integrations/supabase/types").Database["public"]["Tables"]["profiles"]["Row"]
+    | null
+  >(null);
+  const [ownerStore, setOwnerStore] = useState<
+    | import("@/integrations/supabase/types").Database["public"]["Tables"]["stores"]["Row"]
+    | null
+  >(null);
+  const [serviceWorker, setServiceWorker] = useState<
+    | import("@/integrations/supabase/types").Database["public"]["Tables"]["service_workers"]["Row"]
     | null
   >(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,6 +110,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         setUserRole(roleData);
         setCurrentRole(roleData.role as UserRole);
+        // If user is a store owner, fetch their store row (if any)
+        if (roleData.role === "store_owner") {
+          try {
+            const { data: store, error: storeErr } = await supabase
+              .from("stores")
+              .select("*")
+              .eq("owner_id", userId)
+              .maybeSingle();
+            if (storeErr) throw storeErr;
+            setOwnerStore(store ?? null);
+          } catch (e) {
+            console.error("Error fetching owner store:", e);
+            setOwnerStore(null);
+          }
+        } else {
+          setOwnerStore(null);
+        }
+
+        // If user is a service worker, fetch their service_worker row
+        if (roleData.role === "service_worker") {
+          try {
+            const { data: worker, error: workerErr } = await supabase
+              .from("service_workers")
+              .select("*")
+              .eq("profile_id", userId)
+              .maybeSingle();
+            if (workerErr) throw workerErr;
+            setServiceWorker(worker ?? null);
+          } catch (e) {
+            console.error("Error fetching service worker:", e);
+            setServiceWorker(null);
+          }
+        } else {
+          setServiceWorker(null);
+        }
         return data as typeof profile;
       }
 
@@ -234,6 +283,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRole,
         currentRole,
         profile,
+        ownerStore,
+        serviceWorker,
         isAuthenticated: !!user,
         isLoading,
         logout,

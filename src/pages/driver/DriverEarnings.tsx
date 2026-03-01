@@ -1,4 +1,5 @@
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -11,7 +12,9 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { driverStats } from "@/data/driverData";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Database } from "@/integrations/supabase/types";
 
 const periods = [
   { id: "today", label: "Өнөөдөр" },
@@ -19,59 +22,207 @@ const periods = [
   { id: "month", label: "Сар" },
 ];
 
-const transactions = [
-  {
-    id: "1",
-    type: "earning",
-    description: "Хүргэлт #ORD-098",
-    amount: 12000,
-    time: "14:30",
-  },
-  {
-    id: "2",
-    type: "earning",
-    description: "Хүргэлт #ORD-097",
-    amount: 18000,
-    time: "11:20",
-  },
-  {
-    id: "3",
-    type: "bonus",
-    description: "Хурдан хүргэлтийн урамшуулал",
-    amount: 5000,
-    time: "11:25",
-  },
-  {
-    id: "4",
-    type: "earning",
-    description: "Хүргэлт #ORD-096",
-    amount: 6000,
-    time: "09:45",
-  },
-  {
-    id: "5",
-    type: "withdrawal",
-    description: "Хасалт - Банк руу",
-    amount: -50000,
-    time: "Өчигдөр",
-  },
-];
-
 export default function DriverEarnings() {
+  const { profile } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
 
-  const getEarnings = () => {
-    switch (selectedPeriod) {
-      case "today":
-        return driverStats.todayEarnings;
-      case "week":
-        return driverStats.weekEarnings;
-      case "month":
-        return driverStats.monthEarnings;
-      default:
-        return driverStats.todayEarnings;
-    }
+  type EarningsSummary = {
+    total_earnings: number;
+    completed_deliveries: number;
+    average_per_delivery: number;
+    earnings_by_day: { date: string; amount: number; deliveries: number }[];
   };
+
+  const [summary, setSummary] = useState<EarningsSummary | null>(null);
+  const [transactions, setTransactions] = useState<
+    {
+      id: string;
+      type: "earning" | "bonus" | "withdrawal";
+      description: string;
+      amount: number;
+      time: string;
+    }[]
+  >([]);
+  const [totalDeliveries, setTotalDeliveries] = useState<number | null>(null);
+  const [completionRate, setCompletionRate] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const getEarnings = () => (summary ? summary.total_earnings : 0);
+
+  useEffect(() => {
+    let mounted = true;
+    const periodToRange = (p: string) => {
+      const now = new Date();
+      if (p === "today") {
+        const start = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
+        return { start, end: now };
+      }
+      if (p === "week") {
+        const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return { start, end: now };
+      }
+      if (p === "month") {
+        const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return { start, end: now };
+      }
+      return { start: new Date(0), end: now };
+    };
+
+    const load = async () => {
+      if (!profile?.id) return;
+      setLoading(true);
+      try {
+        const { start, end } = periodToRange(selectedPeriod);
+
+        // fetch delivery tasks (delivered) with order totals within range
+        const { data } = (await supabase
+          .from("delivery_tasks")
+          .select("*, order:orders(id, total_amount, user_id)")
+          .eq("driver_id", profile.id)
+          .eq("status", "delivered")
+          .gte("updated_at", start.toISOString())
+          .lte("updated_at", end.toISOString())
+          .order("updated_at", { ascending: false })) as {
+          data: Array<
+            Database["public"]["Tables"]["delivery_tasks"]["Row"] & {
+              order?: Partial<
+                Database["public"]["Tables"]["orders"]["Row"]
+              > | null;
+            }
+          > | null;
+          error: unknown;
+        };
+
+        const rows = data ?? [];
+        // summary
+        const total = rows.reduce(
+          (s, r) => s + (r.order?.total_amount ?? 0),
+          0,
+        );
+        const deliveries = rows.length;
+        const avg = deliveries ? Math.round(total / deliveries) : 0;
+        const byDayMap: Record<string, { amount: number; deliveries: number }> =
+          {};
+        rows.forEach((r) => {
+          const d = new Date(
+            r.updated_at ?? r.created_at ?? Date.now(),
+          ).toLocaleDateString("mn-MN");
+          if (!byDayMap[d]) byDayMap[d] = { amount: 0, deliveries: 0 };
+          byDayMap[d].amount += r.order?.total_amount ?? 0;
+          byDayMap[d].deliveries += 1;
+        });
+
+        const earnings_by_day = Object.entries(byDayMap).map(([date, v]) => ({
+          date,
+          amount: v.amount,
+          deliveries: v.deliveries,
+        }));
+
+        if (mounted)
+          setSummary({
+            total_earnings: total,
+            completed_deliveries: deliveries,
+            average_per_delivery: avg,
+            earnings_by_day,
+          });
+
+        // recent transactions — last 20 delivered orders for driver (across all time)
+        const { data: txRows } = (await supabase
+          .from("delivery_tasks")
+          .select("*, order:orders(id, total_amount)")
+          .eq("driver_id", profile.id)
+          .eq("status", "delivered")
+          .order("updated_at", { ascending: false })
+          .limit(20)) as { data: Array<any> | null; error: unknown };
+
+        const mappedTx = (txRows ?? []).map((r: any) => ({
+          id: r.id,
+          type: "earning" as const,
+          description: `Хүргэлт #${r.order_id ?? r.order?.id ?? r.id}`,
+          amount: r.order?.total_amount ?? 0,
+          time: r.updated_at
+            ? new Date(r.updated_at).toLocaleTimeString("mn-MN", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "",
+        }));
+
+        if (mounted) setTransactions(mappedTx);
+
+        // compute all-time totals for the driver (used by stat cards)
+        try {
+          const { count: deliveredCount } = await supabase
+            .from("delivery_tasks")
+            .select("id", { count: "exact", head: true })
+            .eq("driver_id", profile.id)
+            .eq("status", "delivered");
+
+          const { count: totalCount } = await supabase
+            .from("delivery_tasks")
+            .select("id", { count: "exact", head: true })
+            .eq("driver_id", profile.id);
+
+          if (mounted) {
+            setTotalDeliveries(deliveredCount ?? 0);
+            setCompletionRate(
+              typeof totalCount === "number" && totalCount > 0
+                ? Math.round(((deliveredCount ?? 0) / totalCount) * 100)
+                : 0,
+            );
+          }
+        } catch (err) {
+          // non-fatal — leave stat cards as null
+          console.warn("Failed to load driver totals:", err);
+        }
+      } catch (err) {
+        console.error("Failed to load driver earnings:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+
+    const channel = profile?.id
+      ? supabase
+          .channel(`driver-earnings-${profile.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "delivery_tasks",
+              filter: `driver_id=eq.${profile.id}`,
+            },
+            (payload: any) => load(),
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "delivery_tasks",
+              filter: `driver_id=eq.${profile.id}`,
+            },
+            (payload: any) => load(),
+          )
+          .subscribe()
+      : null;
+
+    return () => {
+      mounted = false;
+      try {
+        channel?.unsubscribe();
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [profile?.id, selectedPeriod]);
 
   return (
     <AppLayout>
@@ -126,7 +277,7 @@ export default function DriverEarnings() {
               <TrendingUp className="w-5 h-5 text-success" />
             </div>
             <p className="text-2xl font-bold text-foreground">
-              {driverStats.totalDeliveries}
+              {totalDeliveries ?? "—"}
             </p>
             <p className="text-xs text-muted-foreground">Нийт хүргэлт</p>
           </div>
@@ -135,7 +286,7 @@ export default function DriverEarnings() {
               <DollarSign className="w-5 h-5 text-primary" />
             </div>
             <p className="text-2xl font-bold text-foreground">
-              {driverStats.completionRate}%
+              {completionRate != null ? `${completionRate}%` : "—"}
             </p>
             <p className="text-xs text-muted-foreground">Гүйцэтгэл</p>
           </div>

@@ -1,15 +1,10 @@
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  CheckCircle,
-  Circle,
-  Camera,
-  Upload,
-  MapPin,
-  Clock,
-  ChevronRight,
-  Image as ImageIcon,
-} from "lucide-react";
+import { CheckCircle, Circle, Camera, MapPin, Clock } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Database } from "@/integrations/supabase/types";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,90 +32,122 @@ interface ActiveJob {
   startedAt: Date;
 }
 
-const mockActiveJobs: ActiveJob[] = [
-  {
-    id: "1",
-    title: "Байшингийн утас шинэчлэх",
-    customerName: "Энхбаяр Г.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face",
-    location: "Сүхбаатар дүүрэг, 1-р хороо",
-    totalPrice: 450000,
-    startedAt: new Date("2024-01-17"),
-    milestones: [
-      {
-        id: "1",
-        title: "Хуучин утас салгах",
-        description: "Бүх өрөөний хуучин цахилгааны утас салгах",
-        completed: true,
-        photoRequired: true,
-        photoUrl:
-          "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400",
-        completedAt: new Date("2024-01-17"),
-      },
-      {
-        id: "2",
-        title: "Шинэ утас татах",
-        description: "Шинэ кабель татаж хананд бэхлэх",
-        completed: true,
-        photoRequired: true,
-        photoUrl:
-          "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400",
-        completedAt: new Date("2024-01-18"),
-      },
-      {
-        id: "3",
-        title: "Залгуур, унтраалга суурилуулах",
-        description: "Бүх залгуур, унтраалга холбож суурилуулах",
-        completed: false,
-        photoRequired: true,
-      },
-      {
-        id: "4",
-        title: "Туршилт хийх",
-        description: "Бүх цахилгааныг туршиж, аюулгүй ажиллагааг шалгах",
-        completed: false,
-        photoRequired: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "LED гэрэлтүүлэг суурилуулах",
-    customerName: "Мөнхжин С.",
-    customerAvatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face",
-    location: "Чингэлтэй дүүрэг, 7-р хороо",
-    totalPrice: 100000,
-    startedAt: new Date("2024-01-18"),
-    milestones: [
-      {
-        id: "1",
-        title: "Байршил тодорхойлох",
-        description: "LED гэрлийн байршлыг тэмдэглэх",
-        completed: true,
-        photoRequired: false,
-        completedAt: new Date("2024-01-18"),
-      },
-      {
-        id: "2",
-        title: "Суурилуулах",
-        description: "LED гэрлийг суурилуулах",
-        completed: false,
-        photoRequired: true,
-      },
-    ],
-  },
-];
+// Supabase-backed rows types
+type ServiceJobRow = Database["public"]["Tables"]["service_jobs"]["Row"];
+type MilestoneRow = Database["public"]["Tables"]["milestones"]["Row"];
 
 export default function WorkerMilestones() {
-  const [selectedJob, setSelectedJob] = useState<string>(
-    mockActiveJobs[0]?.id || "",
-  );
+  const { profile } = useAuth();
+  const [selectedJob, setSelectedJob] = useState<string>("");
+  const [jobsState, setJobsState] = useState<ActiveJob[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const currentJob = mockActiveJobs.find((j) => j.id === selectedJob);
+  // load active service_jobs + their milestones for this worker
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!profile?.id) return;
+      setLoading(true);
+      try {
+        // fetch service_jobs for this worker that are in-progress/accepted
+        const { data: sjRows } = await supabase
+          .from("service_jobs")
+          .select("*")
+          .eq("worker_id", profile.id)
+          .in("status", ["in_progress", "accepted"])
+          .order("created_at", { ascending: false });
 
-  if (!currentJob) {
+        const jobIds = (sjRows ?? []).map((r: any) => r.id);
+        const { data: msRows } = await supabase
+          .from("milestones")
+          .select("*")
+          .in("job_id", jobIds)
+          .order("created_at", { ascending: true });
+
+        const grouped = (sjRows ?? []).map((sj: any) => {
+          const msFor = (msRows ?? []).filter((m: any) => m.job_id === sj.id);
+          const mappedMilestones: Milestone[] = msFor.map(
+            (m: MilestoneRow) => ({
+              id: m.id,
+              title: m.title,
+              description: m.description ?? "",
+              completed: !!m.completed,
+              photoRequired: !!m.photo_url || false,
+              photoUrl: m.photo_url ?? undefined,
+              completedAt: m.completed_at
+                ? new Date(m.completed_at)
+                : undefined,
+            }),
+          );
+
+          const activeJob: ActiveJob = {
+            id: sj.id,
+            title: sj.description ?? "Ажил",
+            customerName: sj.user_id ?? "Хэрэглэгч",
+            customerAvatar: "",
+            location: "",
+            totalPrice: sj.quoted_price ?? 0,
+            milestones: mappedMilestones,
+            startedAt: sj.created_at ? new Date(sj.created_at) : new Date(),
+          };
+          return activeJob;
+        });
+
+        if (!mounted) return;
+        setJobsState(grouped);
+        setSelectedJob((prev) => prev || grouped[0]?.id);
+      } catch (err) {
+        console.error("Failed to load active jobs/milestones:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+
+    // realtime: listen for milestone updates for this worker's jobs
+    const channel = profile?.id
+      ? supabase
+          .channel(`worker-milestones-${profile.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "milestones",
+              filter: `job_id=neq.null`,
+            },
+            (p: any) => {
+              // reload (simple, keeps logic small)
+              load();
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "milestones",
+              filter: `job_id=neq.null`,
+            },
+            (p: any) => load(),
+          )
+          .subscribe()
+      : null;
+
+    return () => {
+      mounted = false;
+      try {
+        channel?.unsubscribe();
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [profile?.id]);
+
+  const currentJob = jobsState.find((j) => j.id === selectedJob);
+
+  if (!currentJob || loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[60vh]">
@@ -158,7 +185,7 @@ export default function WorkerMilestones() {
       {/* Job Selector */}
       <section className="px-4 py-4 max-w-7xl mx-auto">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          {mockActiveJobs.map((job) => (
+          {jobsState.map((job) => (
             <button
               key={job.id}
               onClick={() => setSelectedJob(job.id)}
@@ -169,7 +196,10 @@ export default function WorkerMilestones() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80",
               )}>
               <img
-                src={job.customerAvatar}
+                src={
+                  job.customerAvatar ||
+                  `https://avatars.dicebear.com/api/initials/${encodeURIComponent(job.customerName ?? "U")}.svg`
+                }
                 alt={job.customerName}
                 className="w-6 h-6 rounded-full"
               />

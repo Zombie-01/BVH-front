@@ -22,32 +22,32 @@ type AuthMode = "login" | "signup";
 type UserRole = "user" | "store_owner" | "driver" | "service_worker";
 type VehicleType = "walking" | "bike" | "moped" | "mini_truck";
 
-const roles = [
-  {
-    id: "user" as UserRole,
-    label: "Хэрэглэгч",
-    icon: User,
-    description: "Бараа захиалах",
-  },
-  {
-    id: "store_owner" as UserRole,
-    label: "Дэлгүүрийн эзэн",
-    icon: Store,
-    description: "Бараа зарах",
-  },
-  {
-    id: "driver" as UserRole,
-    label: "Жолооч",
-    icon: Truck,
-    description: "Хүргэлт хийх",
-  },
-  {
-    id: "service_worker" as UserRole,
-    label: "Үйлчилгээ",
-    icon: Wrench,
-    description: "Засвар, угсралт",
-  },
-];
+// const roles = [
+//   {
+//     id: "user" as UserRole,
+//     label: "Хэрэглэгч",
+//     icon: User,
+//     description: "Бараа захиалах",
+//   },
+//   {
+//     id: "store_owner" as UserRole,
+//     label: "Дэлгүүрийн эзэн",
+//     icon: Store,
+//     description: "Бараа зарах",
+//   },
+//   {
+//     id: "driver" as UserRole,
+//     label: "Жолооч",
+//     icon: Truck,
+//     description: "Хүргэлт хийх",
+//   },
+//   {
+//     id: "service_worker" as UserRole,
+//     label: "Үйлчилгээ",
+//     icon: Wrench,
+//     description: "Засвар, угсралт",
+//   },
+// ];
 
 const vehicleTypes = [
   { id: "walking" as VehicleType, label: "Явган" },
@@ -66,7 +66,6 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [selectedRole, setSelectedRole] = useState<UserRole>("user");
   const [vehicleType, setVehicleType] = useState<VehicleType>("bike");
 
   useEffect(() => {
@@ -115,14 +114,10 @@ export default function Auth() {
         const metadata: Record<string, string | null> = {
           name: name || "Хэрэглэгч",
           phone: phone || null,
-          role: selectedRole,
+          role: "user",
         };
 
-        if (selectedRole === "driver") {
-          metadata.vehicle_type = vehicleType;
-        }
-
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -132,15 +127,52 @@ export default function Auth() {
         });
 
         if (error) throw error;
-        toast.success("Бүртгэл амжилттай! Нэвтэрч байна...");
+
+        // If a session was returned the user is already signed in. Otherwise
+        // the project likely requires email confirmation — tell the user to
+        // check their email.
+        if (data?.session) {
+          toast.success("Бүртгэл амжилттай! Нэвтэрч байна...");
+          const userId = data.session.user.id;
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .single();
+          const role = profile?.role;
+          if (role === "store_owner") navigate("/owner/dashboard");
+          else if (role === "driver") navigate("/driver/tasks");
+          else if (role === "service_worker") navigate("/worker/jobs");
+          else navigate("/home");
+        } else {
+          toast.success("Бүртгэл амжилттай! И-мэйлээр баталгаажуулна уу.");
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) throw error;
+
         toast.success("Амжилттай нэвтэрлээ!");
+
+        // When sign in returns a session we can navigate immediately using
+        // the user's profile role. Otherwise the onAuthStateChange handler
+        // will take care of redirecting when the session becomes available.
+        const userId = data?.session?.user?.id;
+        if (userId) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .single();
+          const role = profile?.role;
+          if (role === "store_owner") navigate("/owner/dashboard");
+          else if (role === "driver") navigate("/driver/tasks");
+          else if (role === "service_worker") navigate("/worker/jobs");
+          else navigate("/home");
+        }
       }
     } catch (error: unknown) {
       const err = error as Error;
@@ -186,9 +218,11 @@ export default function Auth() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
-
-      {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      {/* Content */}{" "}
+      <div className="flex-1 flex-col flex items-center justify-center p-6">
+        <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-full">
+          <img src="/logo.png" alt="logo" />
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -251,69 +285,6 @@ export default function Auth() {
           <form onSubmit={handleEmailAuth} className="space-y-4">
             {mode === "signup" && (
               <>
-                {/* Role Selection */}
-                <div className="space-y-2">
-                  <Label>Дүр сонгох</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {roles.map((role) => {
-                      const Icon = role.icon;
-                      const isSelected = selectedRole === role.id;
-                      return (
-                        <button
-                          key={role.id}
-                          type="button"
-                          onClick={() => setSelectedRole(role.id)}
-                          className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                            isSelected
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:border-primary/50"
-                          }`}>
-                          <Icon
-                            className={`w-5 h-5 ${
-                              isSelected
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <div className="text-left">
-                            <p
-                              className={`text-sm font-medium ${
-                                isSelected ? "text-primary" : "text-foreground"
-                              }`}>
-                              {role.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {role.description}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Vehicle Type for Driver */}
-                {selectedRole === "driver" && (
-                  <div className="space-y-2">
-                    <Label>Тээврийн хэрэгсэл</Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {vehicleTypes.map((vehicle) => (
-                        <button
-                          key={vehicle.id}
-                          type="button"
-                          onClick={() => setVehicleType(vehicle.id)}
-                          className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                            vehicleType === vehicle.id
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/50"
-                          }`}>
-                          {vehicle.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="name">Нэр</Label>
                   <div className="relative">

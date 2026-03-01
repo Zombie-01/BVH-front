@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,9 +14,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryPill } from "@/components/common/CategoryPill";
-import { mockDeliveryTasks, vehicleTypes } from "@/data/driverData";
+import { vehicleTypes } from "@/data/driverData";
 import { DriverVehicleType } from "@/types";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Database } from "@/integrations/supabase/types";
 
 const statusConfig = {
   assigned: { label: "Хүлээгдэж байна", color: "bg-warning" },
@@ -27,11 +30,160 @@ const statusConfig = {
 
 export default function DriverTasks() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [selectedVehicle, setSelectedVehicle] = useState<
     DriverVehicleType | "all"
   >("all");
 
-  const filteredTasks = mockDeliveryTasks.filter((task) => {
+  type DriverTaskUI = {
+    id: string;
+    orderId?: string;
+    driverId?: string | null;
+    pickupLocation: string;
+    deliveryLocation: string;
+    status: "assigned" | "picked_up" | "in_transit" | "delivered";
+    estimatedTime?: number | null;
+    distance?: number | null;
+    storeName?: string;
+    items?: string[];
+    weight?: number;
+    reward?: number;
+    vehicleRequired?: DriverVehicleType | undefined;
+  };
+
+  type DeliveryTaskRow = Database["public"]["Tables"]["delivery_tasks"]["Row"];
+  type OrderRow = Database["public"]["Tables"]["orders"]["Row"] & {
+    order_items?: Database["public"]["Tables"]["order_items"]["Row"][];
+  };
+  type DeliveryWithOrder = DeliveryTaskRow & { order?: OrderRow | null };
+
+  const [tasks, setTasks] = useState<DriverTaskUI[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // load tasks assigned to driver (and keep realtime subscription)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!profile?.id) return;
+      setLoading(true);
+      try {
+        const res = (await supabase
+          .from("delivery_tasks")
+          .select(`*, order:orders(id, total_amount, store_id, order_items(*))`)
+          .eq("driver_id", profile.id)
+          .order("created_at", { ascending: false })) as {
+          data: DeliveryWithOrder[] | null;
+          error: unknown;
+        };
+
+        const data = res.data ?? [];
+        if (!mounted) return;
+        const mapped: DriverTaskUI[] = data.map((r) => ({
+          id: r.id,
+          orderId: (r.order_id ?? r.order?.id) as string | undefined,
+          driverId: r.driver_id ?? null,
+          pickupLocation: (r.pickup_location ?? "") as string,
+          deliveryLocation: (r.delivery_location ?? "") as string,
+          status: (r.status as DriverTaskUI["status"]) ?? "assigned",
+          estimatedTime: (r.estimated_time ?? null) as number | null,
+          distance: (r.distance ?? null) as number | null,
+          storeName: (r.order?.store_id as string | undefined) ?? undefined,
+          items:
+            (r.order?.order_items ?? []).map((it) => it.product_name) || [],
+          weight: undefined,
+          reward: r.order?.total_amount ?? undefined,
+          vehicleRequired: undefined,
+        }));
+
+        setTasks(mapped);
+      } catch (err) {
+        console.error("Failed to load delivery tasks:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+
+    if (!profile?.id) return () => {};
+
+    const channel = supabase
+      .channel(`delivery-tasks-driver-${profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "delivery_tasks",
+          filter: `driver_id=eq.${profile.id}`,
+        },
+        (payload: { new: DeliveryWithOrder }) => {
+          const n = payload.new;
+          setTasks((prev) =>
+            prev.some((t) => t.id === n.id)
+              ? prev
+              : [
+                  {
+                    id: n.id,
+                    orderId: n.order_id ?? n.order?.id,
+                    driverId: n.driver_id ?? null,
+                    pickupLocation: n.pickup_location ?? "",
+                    deliveryLocation: n.delivery_location ?? "",
+                    status: (n.status as DriverTaskUI["status"]) ?? "assigned",
+                    estimatedTime: n.estimated_time ?? null,
+                    distance: n.distance ?? null,
+                    storeName: n.order?.store_id ?? undefined,
+                    items:
+                      (n.order?.order_items ?? []).map(
+                        (it) => it.product_name,
+                      ) || [],
+                    reward: n.order?.total_amount ?? undefined,
+                  },
+                  ...prev,
+                ],
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "delivery_tasks",
+          filter: `driver_id=eq.${profile.id}`,
+        },
+        (payload: { new: DeliveryWithOrder }) => {
+          const n = payload.new;
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === n.id
+                ? {
+                    ...t,
+                    pickupLocation: n.pickup_location ?? t.pickupLocation,
+                    deliveryLocation: n.delivery_location ?? t.deliveryLocation,
+                    status: (n.status as DriverTaskUI["status"]) ?? t.status,
+                    estimatedTime: n.estimated_time ?? t.estimatedTime,
+                    distance: n.distance ?? t.distance,
+                    reward: n.order?.total_amount ?? t.reward,
+                  }
+                : t,
+            ),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      try {
+        channel.unsubscribe();
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [profile?.id]);
+
+  const filteredTasks = tasks.filter((task) => {
     if (selectedVehicle === "all") return true;
     return task.vehicleRequired === selectedVehicle;
   });

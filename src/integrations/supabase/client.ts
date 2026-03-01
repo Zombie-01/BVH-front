@@ -5,6 +5,29 @@ import type { Database } from "./types";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Debugging helpers: log whether env vars are present (mask the key).
+try {
+  const maskedKey = SUPABASE_PUBLISHABLE_KEY
+    ? `${SUPABASE_PUBLISHABLE_KEY.slice(0, 6)}...${SUPABASE_PUBLISHABLE_KEY.slice(-6)}`
+    : null;
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    // eslint-disable-next-line no-console
+    console.warn("Supabase env missing:", {
+      SUPABASE_URL: !!SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY: !!SUPABASE_PUBLISHABLE_KEY,
+    });
+  } else {
+    // eslint-disable-next-line no-console
+    console.debug("Supabase client configured:", {
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY: maskedKey,
+    });
+  }
+} catch (e) {
+  // eslint-disable-next-line no-console
+  console.error("Error checking Supabase env vars", e);
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -17,5 +40,5 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
     },
-  }
+  },
 );

@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
         registerType: "autoUpdate",
         injectRegister: "auto",
         includeAssets: ["favicon.svg", "robots.txt", "apple-touch-icon.png"],
-        manifest: {
+        manifest: { 
           name: "Барилгын Үйлчилгээний Хүргэлт",
           short_name: "Үйлчилгээний Хүргэлт",
           description:

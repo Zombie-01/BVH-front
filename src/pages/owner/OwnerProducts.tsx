@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Package, Plus, Search, Edit, Trash2, Filter } from "lucide-react";
@@ -36,6 +37,7 @@ export default function OwnerProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [storeCategories, setStoreCategories] = useState<string[]>([]);
 
   // Modal states
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -44,6 +46,15 @@ export default function OwnerProducts() {
 
   const [productCategories, setProductCategories] = useState<string[]>(["all"]);
   const categories = productCategories;
+
+  // Helper to convert category ID to name
+  const getCategoryName = (categoryId: string | number): string => {
+    if (!categoryId) return "";
+    const id =
+      typeof categoryId === "number" ? categoryId.toString() : categoryId;
+    const found: any = storeCategories.find((cat: any) => cat.id === id);
+    return found?.name || categoryId;
+  };
 
   // Fetch owner's store and products
   const fetchStoreAndProducts = async () => {
@@ -66,7 +77,6 @@ export default function OwnerProducts() {
         const { data: prods, error: prodErr } = await supabase
           .from("products")
           .select("*")
-          .eq("store_id", sid)
           .order("created_at", { ascending: false });
         if (prodErr) throw prodErr;
         if (prods) {
@@ -84,10 +94,17 @@ export default function OwnerProducts() {
           );
         }
 
-        // Use categories from the stores table only
-        if (Array.isArray(storeRow?.categories) && storeRow.categories.length) {
-          setProductCategories(["all", ...storeRow.categories.filter(Boolean)]);
+        // Fetch categories from store_category table
+        const { data: cats, error: catErr } = await supabase
+          .from("store_categories")
+          .select("id, name")
+          .order("name", { ascending: true });
+        if (catErr) throw catErr;
+        if (cats && cats.length > 0) {
+          setStoreCategories(cats);
+          setProductCategories(["all", ...cats.map((cat: any) => cat.id)]);
         } else {
+          setStoreCategories([]);
           setProductCategories(["all"]);
         }
       } else {
@@ -346,7 +363,7 @@ export default function OwnerProducts() {
               variant={selectedCategory === category ? "default" : "secondary"}
               className="cursor-pointer whitespace-nowrap px-4 py-2"
               onClick={() => setSelectedCategory(category)}>
-              {category === "all" ? "Бүгд" : category}
+              {category === "all" ? "Бүгд" : getCategoryName(category)}
             </Badge>
           ))}
         </div>
@@ -409,7 +426,7 @@ export default function OwnerProducts() {
                     </span>
                   </div>
                   <Badge variant="secondary" className="text-xs">
-                    {product.category}
+                    {getCategoryName(product.category)}
                   </Badge>
                 </div>
               </div>
