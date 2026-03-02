@@ -29,12 +29,10 @@ export function TopNav() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 md:px-6">
         <Link to="/home" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-            <HardHat className="w-5 h-5 text-primary-foreground" />
+          <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-full">
+            <img src="/logo.png" alt="logo" />
           </div>
-          <span className="font-bold text-xl hidden sm:inline">
-            Барилга Hub
-          </span>
+          <span className="font-bold text-xl hidden sm:inline">БҮХ</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -52,7 +50,7 @@ export function TopNav() {
                   size="sm"
                   className={cn(
                     "gap-2",
-                    isActive && "bg-primary text-primary-foreground"
+                    isActive && "bg-primary text-primary-foreground",
                   )}>
                   <item.icon className="w-4 h-4" />
                   {item.label}
@@ -74,7 +72,7 @@ export function TopNav() {
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
                 <HardHat className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-bold text-lg">Барилга Hub</span>
+              <span className="font-bold text-lg">БҮХ</span>
             </div>
             <nav className="flex flex-col gap-2">
               {navItems.map((item) => {

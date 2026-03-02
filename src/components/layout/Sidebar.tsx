@@ -86,9 +86,7 @@ export function Sidebar() {
             <HardHat className="w-6 h-6 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-sidebar-foreground text-lg">
-              Барилга Hub
-            </h1>
+            <h1 className="font-bold text-sidebar-foreground text-lg">БҮХ</h1>
             <p className="text-xs text-sidebar-foreground/60">
               {getRoleName()}
             </p>
@@ -114,7 +112,7 @@ export function Sidebar() {
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative group",
                 isActive
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}>
               {isActive && (
                 <motion.div
@@ -126,7 +124,7 @@ export function Sidebar() {
               <Icon
                 className={cn(
                   "w-5 h-5 transition-transform duration-200",
-                  isActive && "scale-110"
+                  isActive && "scale-110",
                 )}
               />
               <span className="font-medium">{item.label}</span>
