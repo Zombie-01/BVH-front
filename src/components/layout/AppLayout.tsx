@@ -100,7 +100,7 @@ function UserFooter() {
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Mail className="w-4 h-4" />
-                <span>info@baraamarket.mn</span>
+                <span>narmandakhurnukh@gmail.com</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4" />
@@ -113,7 +113,7 @@ function UserFooter() {
         {/* Bottom */}
         <div className="mt-8 pt-6 border-t border-border text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Бараа Маркет. Бүх эрх хуулиар хамгаалагдсан.
+            © 2026 Бараа Маркет. Бүх эрх хуулиар хамгаалагдсан.
           </p>
         </div>
       </div>
@@ -144,8 +144,8 @@ export function AppLayout({ children, hideNav = false }: AppLayoutProps) {
             hideNav
               ? "flex-1"
               : isRegularUser
-              ? "flex-1 pb-20 sm:pb-0"
-              : "flex-1 pb-20 lg:pb-0"
+                ? "flex-1 pb-20 sm:pb-0"
+                : "flex-1 pb-20 lg:pb-0"
           }>
           {children}
         </main>
