@@ -145,7 +145,7 @@ export default function Auth() {
           else if (role === "service_worker") navigate("/worker/jobs");
           else navigate("/home");
         } else {
-          toast.success("Бүртгэл амжилттай! И-мэйлээр баталгаажуулна уу.");
+          toast.success("Бүртгэл амжилттай!");
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
