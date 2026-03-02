@@ -32,7 +32,6 @@ export function TopNav() {
           <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-full">
             <img src="/logo.png" alt="logo" />
           </div>
-          <span className="font-bold text-xl hidden sm:inline">БҮХ</span>
         </Link>
 
         {/* Desktop Navigation */}
