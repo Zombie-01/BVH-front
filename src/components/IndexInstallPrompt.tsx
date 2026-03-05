@@ -46,10 +46,6 @@ export function IndexInstallPrompt() {
           <span>Үргэлжүүлэх</span>
         </Button>
       </div>
-
-      <p className="text-xs text-muted-foreground text-center opacity-70">
-        Та хэдэнтэй сонголт хийж болно
-      </p>
     </motion.div>
   );
 }
