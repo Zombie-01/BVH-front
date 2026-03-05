@@ -25,8 +25,20 @@ const detectPlatform = (): Platform => {
     return "capacitor";
   }
 
-  // Messenger in-app browser
-  if (ua.includes("fban/") || ua.includes("fbav/")) {
+  // Messenger in-app browser detection
+  if (
+    ua.includes("fban/") ||
+    ua.includes("fbav/") ||
+    ua.includes("messenger") ||
+    ua.includes("instagram") ||
+    // Check for Messenger webview specific properties
+    (window as any).ReactNativeWebView ||
+    // Check referrer for Messenger/Instagram
+    (document.referrer &&
+      (document.referrer.includes("messenger.com") ||
+        document.referrer.includes("instagram.com") ||
+        document.referrer.includes("facebook.com")))
+  ) {
     console.log("💬 Platform: Messenger/Instagram In-App Browser");
     return "messenger-instagram";
   }
