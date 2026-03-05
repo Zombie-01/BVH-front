@@ -13,19 +13,5 @@
         }
       ]
     }
-  ],
-  "redirects": [
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(FBAN|FBAV|Messenger).*"
-        }
-      ],
-      "permanent": false,
-      "destination": "/open-in-browser-instructions"
-    }
   ]
 }
