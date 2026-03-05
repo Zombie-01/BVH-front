@@ -5,11 +5,43 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+export type Platform =
+  | "browser"
+  | "messenger-instagram"
+  | "capacitor"
+  | "unknown";
+
+// Detect current platform
+const detectPlatform = (): Platform => {
+  const ua = navigator.userAgent.toLowerCase();
+
+  // Capacitor app detection (wrapped in native iOS/Android container)
+  if (
+    (window as any).Capacitor ||
+    (window as any).cordova ||
+    ua.includes("capacitor")
+  ) {
+    console.log("📱 Platform: Capacitor Mobile App");
+    return "capacitor";
+  }
+
+  // Messenger in-app browser
+  if (ua.includes("fban/") || ua.includes("fbav/")) {
+    console.log("💬 Platform: Messenger/Instagram In-App Browser");
+    return "messenger-instagram";
+  }
+
+  // Regular browser
+  console.log("🌐 Platform: Regular Browser");
+  return "browser";
+};
+
 export function useInstallPrompt() {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [platform, setPlatform] = useState<Platform>("unknown");
 
   // Check if app is already installed
   const checkIfInstalled = () => {
@@ -32,10 +64,22 @@ export function useInstallPrompt() {
   };
 
   useEffect(() => {
+    // Detect platform first
+    const detectedPlatform = detectPlatform();
+    setPlatform(detectedPlatform);
+
+    // If Capacitor app, disable PWA features
+    if (detectedPlatform === "capacitor") {
+      console.log("ℹ PWA: Capacitor app detected - PWA features disabled");
+      setIsInstallable(false);
+      setIsInstalled(true); // Hide button
+      return;
+    }
+
     // Check initial state
     checkIfInstalled();
 
-    // Handle beforeinstallprompt event
+    // Handle beforeinstallprompt event (browser only)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       console.log("✓ PWA: beforeinstallprompt captured - install button ready");
@@ -100,9 +144,16 @@ export function useInstallPrompt() {
     }
   };
 
+  const openInBrowser = () => {
+    console.log("ℹ PWA: Opening in external browser");
+    window.open(window.location.href, "_blank");
+  };
+
   return {
     isInstallable,
     isInstalled,
     install,
+    platform,
+    openInBrowser,
   };
 }

@@ -4,6 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SplashScreenProvider } from "@/contexts/SplashScreenContext";
+import { SplashScreen } from "@/components/SplashScreen";
+import { useEffect } from "react";
+import { useSplashScreen } from "@/contexts/SplashScreenContext";
 
 // Pages
 import Index from "./pages/Index";
@@ -48,9 +52,22 @@ import WorkerChatDetail from "./pages/worker/WorkerChatDetail";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
+// Inner component that uses splash screen context
+function AppContent() {
+  const { hideSplash } = useSplashScreen();
+
+  useEffect(() => {
+    // Hide splash screen after app is mounted
+    // This gives time for initial render to complete
+    const timer = setTimeout(() => {
+      hideSplash();
+    }, 2500); // 2.5 seconds for animations
+
+    return () => clearTimeout(timer);
+  }, [hideSplash]);
+
+  return (
+    <>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -106,6 +123,17 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+    </>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <SplashScreenProvider>
+        <SplashScreen minDuration={2500} />
+        <AppContent />
+      </SplashScreenProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
