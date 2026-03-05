@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Package, Truck, Wrench, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IndexInstallPrompt } from "@/components/IndexInstallPrompt";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -87,10 +88,11 @@ const Index = () => {
           </motion.div>
 
           {/* CTA Desktop */}
-          <div className="hidden lg:block mt-10">
+          <div className="hidden lg:block mt-10 space-y-4">
+            <IndexInstallPrompt />
             <Button
               size="lg"
-              className="h-14 px-10 rounded-2xl text-base font-medium"
+              className="w-full h-14 px-10 rounded-2xl text-base font-medium"
               onClick={() => navigate("/auth")}>
               Эхлэх
               <ArrowRight className="w-5 h-5 ml-2" />
@@ -120,7 +122,8 @@ const Index = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="p-6 lg:hidden">
+        className="p-6 lg:hidden space-y-4">
+        <IndexInstallPrompt />
         <Button
           size="lg"
           className="w-full h-14 rounded-2xl text-base font-medium"
