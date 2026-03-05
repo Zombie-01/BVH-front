@@ -159,7 +159,7 @@ export function AppLayout({ children, hideNav = false }: AppLayoutProps) {
 
         {/* Mobile Bottom Nav for regular users, mobile/tablet for others */}
         {!hideNav && (
-          <div className={isRegularUser ? "sm:hidden" : "lg:hidden"}>
+          <div className={"lg:hidden"}>
             <BottomNav />
           </div>
         )}

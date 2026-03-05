@@ -32,6 +32,7 @@ export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Data will be fetched from Supabase
   const [featuredStores, setFeaturedStores] = useState<any[]>([]);
@@ -113,6 +114,13 @@ export default function Home() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
             placeholder="Дэлгүүр, бараа хайх..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+              }
+            }}
             className="pl-12 h-12 bg-white border-0 shadow-lg rounded-xl"
           />
         </div>

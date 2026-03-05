@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   ArrowLeft,
@@ -10,65 +10,28 @@ import {
   Camera,
   MoreVertical,
   Phone,
+  DollarSign,
   Check,
   X,
-  ChevronDown,
-  ChevronUp,
-  Wrench,
-  DollarSign,
   Edit2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-interface ServiceRequest {
+interface WorkerChatData {
   id: string;
-  customer: { name: string; avatar: string; id?: string | null };
-  description: string;
-  expectedPrice: number;
-  status: "negotiating" | "agreed" | "completed";
+  customer: { id?: string | null; name: string | null; avatar?: string | null };
+  expectedPrice?: number | null;
+  status: "negotiating" | "agreed" | "cancelled" | "completed";
+  workerId?: string | null;
+  type?: "store" | "service" | "driver";
+  serviceDescription?: string | null;
+  orderId?: string | null;
 }
-
-const mockServiceRequest: ServiceRequest = {
-  id: "1",
-  customer: {
-    name: "Оюунтөгс Б.",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
-  },
-  description: "Гал тогооны цахилгааны утас солих, шинэ залгуур суурилуулах",
-  expectedPrice: 180000,
-  status: "negotiating",
-};
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: "1",
-    chatId: "1",
-    senderId: "user-1",
-    senderRole: "user",
-    content: "Сайн байна уу, гал тогооны цахилгааны асуудалтай байна",
-    createdAt: new Date("2024-01-17T09:00:00"),
-    read: true,
-    messageType: "text",
-  },
-  {
-    id: "2",
-    chatId: "1",
-    senderId: "user-1",
-    senderRole: "user",
-    content: "150,000₮ төлөх боломжтой",
-    createdAt: new Date("2024-01-17T09:05:00"),
-    read: true,
-    messageType: "price_proposal",
-    dealAmount: 150000,
-  },
-];
 
 export default function WorkerChatDetail() {
   const { id } = useParams();
@@ -76,16 +39,25 @@ export default function WorkerChatDetail() {
   const location = useLocation();
   const { user, profile } = useAuth();
 
-  const [serviceRequest, setServiceRequest] = useState<ServiceRequest | null>(
-    null,
-  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [chatName, setChatName] = useState("Чат");
   const [newMessage, setNewMessage] = useState("");
-  const [showServiceHeader, setShowServiceHeader] = useState(true);
-  const [chatStatus, setChatStatus] = useState<
-    "negotiating" | "agreed" | "completed"
-  >("negotiating");
+  const [loading, setLoading] = useState(true);
+
+  // chat metadata (for negotiation, linking to job/order, etc.)
+  const [chatDataState, setChatDataState] = useState<WorkerChatData | null>(null);
+  const chatData = chatDataState;
+
+  // keep negotiation state in sync when metadata changes
+  useEffect(() => {
+    if (!chatData) return;
+    setChatStatus(chatData.status as any);
+    setPendingProposal(chatData.expectedPrice ?? null);
+  }, [chatData]);
+
+  // Negotiation state
+  const [chatStatus, setChatStatus] = useState<"negotiating" | "agreed" | "completed" | "cancelled">("negotiating");
   const [agreedPrice, setAgreedPrice] = useState<number | null>(null);
   const [pendingProposal, setPendingProposal] = useState<number | null>(null);
   const [showCounterInput, setShowCounterInput] = useState(false);
@@ -94,60 +66,67 @@ export default function WorkerChatDetail() {
   useEffect(() => {
     async function load() {
       if (!id) return;
-      // Try to load order (job)
       try {
-        const { data: order } = (await supabase
-          .from("orders")
-          .select("*, user:profiles(id, name, avatar)")
+        // Load chat by ID
+        const { data: chatRow } = (await supabase
+          .from("chats")
+          .select("*")
           .eq("id", id)
           .maybeSingle()) as any;
 
-        if (order) {
-          setServiceRequest({
-            id: order.id,
+        if (chatRow) {
+          setChatId(chatRow.id);
+
+          // populate chatDataState for later decision logic
+          setChatDataState({
+            id: chatRow.id,
             customer: {
-              id: order.user?.id ?? null,
-              name: order.user?.name ?? null,
-              avatar: order.user?.avatar ?? null,
+              id: chatRow.user_id ?? null,
+              name: null,
+              avatar: null,
             },
-            description: order.description ?? "",
-            expectedPrice: order.expected_price ?? 0,
-            status: order.status ?? "negotiating",
+            expectedPrice: chatRow.expected_price ?? null,
+            status: (chatRow.status as any) ?? "negotiating",
+            workerId: chatRow.worker_id ?? null,
+            type: chatRow.type ?? undefined,
+            serviceDescription: chatRow.service_description ?? null,
+            orderId: chatRow.order_id ?? null,
           });
-          setChatStatus(order.status ?? "negotiating");
-          setPendingProposal(order.expected_price ?? null);
-        } else if (
-          location.state &&
-          (location.state as any).serviceDescription
-        ) {
-          // Fallback to location state if navigation provided it
-          const s = location.state as any;
-          setServiceRequest({
-            id: id as string,
-            customer: { name: s.name ?? null, avatar: null },
-            description: s.serviceDescription ?? "",
-            expectedPrice: s.expectedPrice ?? 0,
-            status: "negotiating",
-          });
-          setPendingProposal(s.expectedPrice ?? null);
-        }
 
-        // Find a chat linked to this order
-        const { data: chatRow } = await supabase
-          .from("chats")
-          .select("*")
-          .eq("order_id", id)
-          .maybeSingle();
+          // set negotiation state from row
+          setChatStatus((chatRow.status as any) ?? "negotiating");
+          setPendingProposal(chatRow.expected_price ?? null);
+          setAgreedPrice(chatRow.agreed_price ?? null);
 
-        if ((chatRow && chatRow?.data) ?? chatRow) {
-          const row = (chatRow as any).data ?? chatRow;
-          setChatId(row.id);
-          // load messages
+          // Fetch customer profile to set chat name & update chatDataState
+          if (chatRow.user_id) {
+            const { data: profileData } = (await supabase
+              .from("profiles")
+              .select("id, name, avatar")
+              .eq("id", chatRow.user_id)
+              .maybeSingle()) as any;
+            setChatName(profileData?.name ?? "Үзүүлэлтээр");
+            setChatDataState((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    customer: {
+                      id: profileData?.id ?? null,
+                      name: profileData?.name ?? null,
+                      avatar: profileData?.avatar ?? null,
+                    },
+                  }
+                : prev,
+            );
+          }
+
+          // Load messages
           const { data: msgs } = await supabase
             .from("chat_messages")
             .select("*")
-            .eq("chat_id", row.id)
+            .eq("chat_id", chatRow.id)
             .order("created_at", { ascending: true });
+
           const mapped = (msgs ?? []).map((m: any) => ({
             id: m.id,
             chatId: m.chat_id,
@@ -161,14 +140,26 @@ export default function WorkerChatDetail() {
             dealAmount: m.deal_amount ?? undefined,
           })) as ChatMessage[];
           setMessages(mapped);
+
+          // Mark chat as read (clear unread count)
+          try {
+            await (supabase as any)
+              .from("chats")
+              .update({ unread_count: 0 })
+              .eq("id", chatRow.id);
+          } catch (e) {
+            /* ignore */
+          }
         }
       } catch (err) {
-        console.error("Failed to load worker chat detail:", err);
+        console.error("Failed to load chat:", err);
+      } finally {
+        setLoading(false);
       }
     }
 
     load();
-  }, [id, location.state]);
+  }, [id]);
 
   // realtime subscription for incoming messages (deduped)
   useEffect(() => {
@@ -222,47 +213,17 @@ export default function WorkerChatDetail() {
     scrollToBottom();
   }, [messages]);
 
-  const ensureChatExists = async () => {
-    if (chatId) return chatId;
-    if (!serviceRequest) return null;
-
-    // create a chat row linking to the order
-    try {
-      const payload = {
-        user_id: serviceRequest.customer.id ?? null,
-        worker_id: profile?.id ?? null,
-        order_id: serviceRequest.id,
-        type: "service",
-        status: "negotiating",
-        last_message: null,
-      } as any;
-
-      const { data } = (await (supabase as any)
-        .from("chats")
-        .insert(payload)
-        .select()
-        .maybeSingle()) as any;
-
-      if (data) {
-        setChatId(data.id);
-        return data.id;
-      }
-    } catch (err) {
-      console.error("Failed to create chat:", err);
-    }
-    return null;
-  };
-
   const insertMessage = async (messagePayload: any) => {
     try {
-      const idToUse = await ensureChatExists();
-      if (!idToUse) return null;
-      const payload = { ...messagePayload, chat_id: idToUse };
+      if (!chatId) return null;
+
+      const payload = { ...messagePayload, chat_id: chatId };
       const { data } = (await (supabase as any)
         .from("chat_messages")
         .insert(payload as any)
         .select()
         .maybeSingle()) as any;
+
       if (data) {
         const mapped: ChatMessage = {
           id: data.id,
@@ -281,11 +242,11 @@ export default function WorkerChatDetail() {
           prev.some((x) => x.id === mapped.id) ? prev : [...prev, mapped],
         );
 
-        // update chat last_message
+        // Update chat last_message
         await (supabase as any)
           .from("chats")
           .update({ last_message: mapped.content } as any)
-          .eq("id", idToUse);
+          .eq("id", chatId);
 
         return mapped;
       }
@@ -300,35 +261,85 @@ export default function WorkerChatDetail() {
     setChatStatus("agreed");
     setPendingProposal(null);
 
-    await insertMessage({
-      sender_id: profile?.id ?? user?.id,
-      sender_role: "worker",
-      content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
-      message_type: "deal_accepted",
-      deal_amount: price,
-    });
+    if (!chatId || !user) return;
 
-    // Optionally create or update order status as confirmed
-    if (serviceRequest) {
+    try {
+      const payload = {
+        sender_id: profile?.id ?? user?.id,
+        sender_role: "worker",
+        content: `${price?.toLocaleString()}₮-р зөвшөөрлөө ✓`,
+        message_type: "deal_accepted",
+        deal_amount: price,
+      };
+
+      await insertMessage(payload);
+
+      // Update chat status
+      await (supabase as any)
+        .from("chats")
+        .update({
+          last_message: payload.content,
+          updated_at: new Date().toISOString(),
+          status: "agreed",
+          agreed_price: price,
+        } as any)
+        .eq("id", chatId);
+
+      // create an order if none exists for this chat (same as owner flow)
       try {
-        await (supabase as any)
+        if (chatData?.orderId) return; // already has order
+        const orderPayload = {
+          user_id: chatData?.customer.id ?? null,
+          store_id: null,
+          worker_id: profile?.id ?? user?.id,
+          chat_id: chatId,
+          type: chatData?.type === "service" ? "service" : "delivery",
+          status: "confirmed",
+          expected_price: chatData?.expectedPrice ?? price,
+          agreed_price: price,
+          total_amount: price,
+          service_description: chatData?.serviceDescription ?? null,
+        } as any;
+
+        const { data: orderData } = (await supabase
           .from("orders")
-          .update({ status: "confirmed", agreed_price: price } as any)
-          .eq("id", serviceRequest.id);
+          .insert(orderPayload)
+          .select()
+          .maybeSingle()) as any;
+
+        if (orderData) {
+          await (supabase as any)
+            .from("chats")
+            .update({ order_id: orderData.id, updated_at: new Date().toISOString() } as any)
+            .eq("id", chatId);
+          setChatDataState((prev) =>
+            prev ? { ...prev, orderId: orderData.id } : prev,
+          );
+        }
       } catch (err) {
-        console.error("Failed to update order status:", err);
+        console.error("Failed to create order after agreement:", err);
       }
+    } catch (err) {
+      console.error("Accept price failed:", err);
     }
   };
 
   const handleRejectPrice = async () => {
     setPendingProposal(null);
-    await insertMessage({
-      sender_id: profile?.id ?? user?.id,
-      sender_role: "worker",
-      content: "Уучлаарай, энэ үнэ тохирохгүй байна",
-      message_type: "deal_rejected",
-    });
+
+    if (!chatId || !user) return;
+    try {
+      const payload = {
+        sender_id: profile?.id ?? user?.id,
+        sender_role: "worker",
+        content: "Уучлаарай, энэ үнэ тохирохгүй байна",
+        message_type: "deal_rejected",
+      };
+
+      await insertMessage(payload);
+    } catch (err) {
+      console.error("Reject price failed:", err);
+    }
   };
 
   const handleCounterOffer = async () => {
@@ -339,13 +350,20 @@ export default function WorkerChatDetail() {
     setShowCounterInput(false);
     setCounterPrice("");
 
-    await insertMessage({
-      sender_id: profile?.id ?? user?.id,
-      sender_role: "worker",
-      content: `${price?.toLocaleString()}₮ санал болгож байна`,
-      message_type: "price_proposal",
-      deal_amount: price,
-    });
+    if (!chatId || !user) return;
+    try {
+      const payload = {
+        sender_id: profile?.id ?? user?.id,
+        sender_role: "worker",
+        content: `${price?.toLocaleString()}₮ санал болгож байна`,
+        message_type: "price_proposal",
+        deal_amount: price,
+      };
+
+      await insertMessage(payload);
+    } catch (err) {
+      console.error("Counter offer failed:", err);
+    }
   };
 
   const handleSend = async () => {
@@ -403,6 +421,26 @@ export default function WorkerChatDetail() {
 
   const isMyMessage = (senderRole: string) => senderRole === "worker";
 
+  if (!chatId && !loading) {
+    return (
+      <AppLayout hideNav>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">Чат олдсонгүй</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <AppLayout hideNav>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">Ачаалж байна...</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
   const renderMessage = (message: ChatMessage) => {
     const isMine = isMyMessage(message.senderRole);
 
@@ -416,7 +454,7 @@ export default function WorkerChatDetail() {
           <div className="bg-green-500/10 border border-green-500 px-4 py-2 rounded-full">
             <p className="text-sm text-green-600 font-medium flex items-center gap-2">
               <Check className="w-4 h-4" />
-              {message.dealAmount}₮ тохиролцсон
+              {message.dealAmount?.toLocaleString()}₮ тохиролцсон
             </p>
           </div>
         </motion.div>
@@ -477,25 +515,18 @@ export default function WorkerChatDetail() {
             className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <img
-            src={serviceRequest.customer.avatar}
-            alt={serviceRequest.customer.name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
+          {chatData?.customer.avatar && (
+            <img
+              src={chatData.customer.avatar}
+              alt={chatData.customer.name ?? ""}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          )}
           <div className="flex-1">
-            <h1 className="font-semibold text-foreground">
-              {serviceRequest.customer.name}
-            </h1>
-            <p
-              className={`text-xs ${
-                chatStatus === "agreed"
-                  ? "text-green-500"
-                  : "text-muted-foreground"
-              }`}>
-              {chatStatus === "agreed"
-                ? "Тохиролцсон ✓"
-                : "Үнэ тохиролцож байна"}
-            </p>
+            <h1 className="font-semibold text-foreground">{chatName}</h1>
+            {chatStatus === "agreed" && (
+              <p className="text-xs text-green-500">Тохиролцсон ✓</p>
+            )}
           </div>
           <button className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
             <Phone className="w-5 h-5 text-foreground" />
@@ -506,49 +537,13 @@ export default function WorkerChatDetail() {
         </div>
 
         {/* Service Header */}
-        <motion.div
-          initial={false}
-          animate={{ height: showServiceHeader ? "auto" : 48 }}
-          className="bg-card border-b border-border overflow-hidden">
-          <button
-            onClick={() => setShowServiceHeader(!showServiceHeader)}
-            className="w-full px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-primary" />
-              <span className="font-medium text-sm">Үйлчилгээний хүсэлт</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant={chatStatus === "agreed" ? "default" : "secondary"}
-                className={chatStatus === "agreed" ? "bg-green-500" : ""}>
-                {agreedPrice
-                  ? `${agreedPrice?.toLocaleString()}₮`
-                  : `~${serviceRequest.expectedPrice?.toLocaleString()}₮`}
-              </Badge>
-              {showServiceHeader ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {showServiceHeader && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="px-4 pb-3">
-                <div className="bg-muted rounded-lg p-3">
-                  <p className="text-sm text-foreground">
-                    {serviceRequest.description}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+        {chatData?.serviceDescription && (
+          <div className="bg-card border-b border-border px-4 py-2">
+            <p className="text-sm text-foreground">
+              {chatData.serviceDescription}
+            </p>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-background">
@@ -577,71 +572,73 @@ export default function WorkerChatDetail() {
           })}
 
           {/* Price Proposal Action Card */}
-          {pendingProposal && chatStatus === "negotiating" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-primary/10 border-2 border-primary rounded-2xl p-4 my-4">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-5 h-5 text-primary" />
-                <span className="font-semibold text-foreground">
-                  Хэрэглэгчийн үнийн санал
-                </span>
-              </div>
-
-              <p className="text-2xl font-bold text-primary mb-4">
-                {pendingProposal?.toLocaleString()}₮
-              </p>
-
-              {!showCounterInput ? (
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={() => handleAcceptPrice(pendingProposal)}>
-                    <Check className="w-4 h-4 mr-2" />
-                    Зөвшөөрөх
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCounterInput(true)}>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Өөрчлөх
-                  </Button>
-                  <Button variant="ghost" onClick={handleRejectPrice}>
-                    <X className="w-4 h-4" />
-                  </Button>
+          {pendingProposal &&
+            chatStatus === "negotiating" &&
+            !chatData?.orderId && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-primary/10 border-2 border-primary rounded-2xl p-4 my-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                  <span className="font-semibold text-foreground">
+                    Хэрэглэгчийн үнийн санал
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-3">
+
+                <p className="text-2xl font-bold text-primary mb-4">
+                  {pendingProposal?.toLocaleString()}₮
+                </p>
+
+                {!showCounterInput ? (
                   <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={counterPrice}
-                      onChange={(e) =>
-                        setCounterPrice(e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                      placeholder="Шинэ үнэ оруулах"
+                    <Button
                       className="flex-1"
-                    />
-                    <span className="flex items-center text-muted-foreground">
-                      ₮
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button className="flex-1" onClick={handleCounterOffer}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Санал илгээх
+                      onClick={() => handleAcceptPrice(pendingProposal)}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Зөвшөөрөх
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => setShowCounterInput(false)}>
-                      Болих
+                      onClick={() => setShowCounterInput(true)}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Өөрчлөх
+                    </Button>
+                    <Button variant="ghost" onClick={handleRejectPrice}>
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={counterPrice}
+                        onChange={(e) =>
+                          setCounterPrice(e.target.value.replace(/[^0-9]/g, ""))
+                        }
+                        placeholder="Шинэ үнэ оруулах"
+                        className="flex-1"
+                      />
+                      <span className="flex items-center text-muted-foreground">
+                        ₮
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={handleCounterOffer}>
+                        <Send className="w-4 h-4 mr-2" />
+                        Санал илгээх
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCounterInput(false)}>
+                        Болих
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
           {/* Deal Confirmed */}
           {chatStatus === "agreed" && agreedPrice && (
@@ -654,7 +651,7 @@ export default function WorkerChatDetail() {
                   <Check className="w-7 h-7" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Ажил баталгаажлаа!</h3>
+                  <h3 className="font-bold text-lg">Үйлчилгээ баталгаажлаа!</h3>
                   <p className="text-white/80">
                     Тохирсон үнэ: {agreedPrice?.toLocaleString()}₮
                   </p>
@@ -668,39 +665,52 @@ export default function WorkerChatDetail() {
 
         {/* Input */}
         <div className="bg-card border-t border-border p-4 safe-area-bottom">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-              <Camera className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-              <Image className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <Input
-              placeholder="Мессеж бичих..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1"
-            />
-            <Button
-              size="icon"
-              onClick={handleSend}
-              disabled={!newMessage.trim()}
-              className="flex-shrink-0">
-              <Send className="w-5 h-5" />
-            </Button>
-          </div>
+          {chatData?.orderId ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-foreground">
+                Үйлчилгээний ажил <span className="font-medium">#{chatData.orderId}</span> үүссэн тул чат хаагдсан.
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={() => navigate("/worker/jobs")}>Ажлыг харах</Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                  <Camera className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                  <Image className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <Input
+                  placeholder="Мессеж бичих..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  className="flex-1"
+                />
+                <Button
+                  size="icon"
+                  onClick={handleSend}
+                  disabled={!newMessage.trim()}
+                  className="flex-shrink-0">
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </AppLayout>

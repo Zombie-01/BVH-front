@@ -33,7 +33,7 @@ const statusConfig = {
 
 export default function WorkerQuotes() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, serviceWorker } = useAuth();
   const [filter, setFilter] = useState<
     "all" | "pending" | "quoted" | "accepted" | "in_progress" | "completed"
   >("all");
@@ -45,22 +45,37 @@ export default function WorkerQuotes() {
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      if (!profile?.id) return;
+      console.log(
+        "Loading worker quotes/chats for worker_id:",
+        serviceWorker?.id,
+      );
+      if (!serviceWorker?.id) return;
       setLoading(true);
       try {
         // fetch service jobs for this worker + chats that belong to this worker
-        const [sjRes, chatsRes] = await Promise.all([
-          supabase
-            .from("service_jobs")
-            .select(`*, user:profiles(id, name, avatar)`)
-            .eq("worker_id", profile.id)
-            .order("created_at", { ascending: false }),
+        const [chatsRes, sjRes] = await Promise.all([
           supabase
             .from("chats")
-            .select(`*, user:profiles(id, name, avatar)`)
-            .eq("worker_id", profile.id)
-            .order("updated_at", { ascending: false }),
-        ] as const);
+            .select(
+              `
+      *,
+      user:profiles!chats_user_id_fkey(id, name, avatar)
+    `,
+            )
+            .eq("worker_id", serviceWorker.id)
+            .order("created_at", { ascending: false }),
+
+          supabase
+            .from("service_jobs")
+            .select(
+              `
+      *,
+      user:profiles!service_jobs_user_id_fkey(id, name, avatar)
+    `,
+            )
+            .eq("worker_id", serviceWorker.id)
+            .order("created_at", { ascending: false }),
+        ]);
 
         if (!mounted) return;
         if (sjRes.data) setServiceJobs(sjRes.data as ServiceJobRow[]);
@@ -76,7 +91,7 @@ export default function WorkerQuotes() {
     return () => {
       mounted = false;
     };
-  }, [profile?.id]);
+  }, [serviceWorker]);
 
   // realtime: update chats/service_jobs for this worker (scoped)
   useEffect(() => {
@@ -247,7 +262,7 @@ export default function WorkerQuotes() {
           </p>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex flex-col gap-2 overflow-x-auto pb-2">
           {chats.length === 0 ? (
             <div className="text-xs text-muted-foreground">Чат байхгүй</div>
           ) : (

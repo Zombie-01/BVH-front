@@ -88,12 +88,10 @@ export default function WorkerJobs() {
     async function loadJobs() {
       setLoading(true);
       try {
-        // Fetch service type orders. We include the user's profile for display.
+        // Fetch service type orders with customer profile data.
         const { data } = (await supabase
           .from("orders")
-          .select(
-            `id, description, expected_price, agreed_price, total_amount, status, scheduled_date, created_at, user:profiles(id, name, avatar)`,
-          )
+          .select(`*, user:profiles!orders_user_id_fkey(id, name, avatar)`)
           .eq("type", "service")) as any;
 
         const mapped: Job[] = (data ?? []).map((row: any) => ({
@@ -111,6 +109,7 @@ export default function WorkerJobs() {
               : ((row.status as any) ?? "new"),
           expectedBudget: row.expected_price ?? 0,
           quotedPrice: row.agreed_price ?? undefined,
+          chat_id: row.chat_id ?? undefined,
           createdAt: row.created_at ? new Date(row.created_at) : new Date(),
           scheduledDate: row.scheduled_date
             ? new Date(row.scheduled_date)
@@ -216,9 +215,6 @@ export default function WorkerJobs() {
                       </p>
                     </div>
                   </div>
-                  <Badge className={cn(status.color, "text-white text-xs")}>
-                    {status.label}
-                  </Badge>
                 </div>
 
                 {/* Content */}
@@ -272,7 +268,7 @@ export default function WorkerJobs() {
                     size="sm"
                     className="flex-1"
                     onClick={() =>
-                      navigate(`/worker/chats/${job.id}`, {
+                      navigate(`/worker/chats/${job.chat_id}`, {
                         state: {
                           type: "worker",
                           name: job.customerName,
@@ -284,15 +280,6 @@ export default function WorkerJobs() {
                     }>
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Чат
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() =>
-                      navigate(`/worker/quotes`, { state: { jobId: job.id } })
-                    }>
-                    {job.status === "new" ? "Үнэ илгээх" : "Дэлгэрэнгүй"}
-                    <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
               </motion.div>
