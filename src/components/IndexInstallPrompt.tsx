@@ -29,7 +29,7 @@ export function IndexInstallPrompt() {
       <div className="flex gap-3">
         {/* Install App Button */}
         <Button
-          size="lg"
+          size="sm"
           className="flex-1 h-12 rounded-xl font-medium gap-2"
           onClick={install}>
           <Download className="w-4 h-4" />
@@ -38,7 +38,7 @@ export function IndexInstallPrompt() {
 
         {/* Stay in Browser Button */}
         <Button
-          size="lg"
+          size="sm"
           variant="outline"
           className="flex-1 h-12 rounded-xl font-medium gap-2"
           onClick={() => (window.location.href = "/auth")}>

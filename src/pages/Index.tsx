@@ -125,7 +125,7 @@ const Index = () => {
         className="p-6 lg:hidden space-y-4">
         <IndexInstallPrompt />
         <Button
-          size="lg"
+          size="sm"
           className="w-full h-14 rounded-2xl text-base font-medium"
           onClick={() => navigate("/auth")}>
           Эхлэх

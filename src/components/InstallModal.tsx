@@ -73,8 +73,8 @@ export function InstallModal() {
 
             {/* Description */}
             <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
-              Апп суулгаж илүү хурдан, илүү дөнсөнгөөр ашигла. Оффлайнаар ч
-              ажилладаг.
+              Апп суулгаж илүү хурдан, илүү хөнгөн ашигла. Оффлайнаар ч ажиллах
+              боломжтой.
             </p>
 
             {/* Features */}
@@ -83,13 +83,13 @@ export function InstallModal() {
                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                   <Download className="w-4 h-4 text-primary" />
                 </div>
-                <p className="text-sm">Аппыг үндсэн дээр нэмэх</p>
+                <p className="text-sm">Аппыг суулгах</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                   <Globe className="w-4 h-4 text-primary" />
                 </div>
-                <p className="text-sm">Интернет байгаа үедээ оффлайн ажилла</p>
+                <p className="text-sm">Интернетгүй байгаа үедээ ч ажиллана</p>
               </div>
             </div>
 
@@ -110,7 +110,7 @@ export function InstallModal() {
                 variant="outline"
                 className="w-full h-12 rounded-xl font-medium"
                 onClick={handleSkip}>
-                24 цаг хүлээх
+                Алгасах
               </Button>
             </div>
           </motion.div>
