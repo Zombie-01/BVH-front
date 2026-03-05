@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SplashScreenProvider } from "@/contexts/SplashScreenContext";
 import { SplashScreen } from "@/components/SplashScreen";
+import { InstallModal } from "@/components/InstallModal";
 import { useEffect } from "react";
 import { useSplashScreen } from "@/contexts/SplashScreenContext";
 
@@ -132,6 +133,7 @@ const App = () => (
     <AuthProvider>
       <SplashScreenProvider>
         <SplashScreen minDuration={2500} />
+        <InstallModal />
         <AppContent />
       </SplashScreenProvider>
     </AuthProvider>

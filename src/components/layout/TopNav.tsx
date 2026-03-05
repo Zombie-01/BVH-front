@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { InstallAppButton } from "@/components/InstallAppButton";
 
 const navItems = [
   { path: "/home", label: "Нүүр", icon: Home },
@@ -61,46 +60,43 @@ export function TopNav() {
         </nav>
 
         {/* Tablet Menu */}
-        <div className="flex items-center gap-2">
-          <InstallAppButton />
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-64">
-              <div className="flex items-center gap-2 mb-8">
-                <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                  <HardHat className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <span className="font-bold text-lg">БҮХ</span>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon">
+              <Menu className="w-5 h-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-64">
+            <div className="flex items-center gap-2 mb-8">
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+                <HardHat className="w-5 h-5 text-primary-foreground" />
               </div>
-              <nav className="flex flex-col gap-2">
-                {navItems.map((item) => {
-                  const isActive =
-                    location.pathname === item.path ||
-                    (item.path !== "/home" &&
-                      item.path !== "/profile" &&
-                      location.pathname.startsWith(item.path));
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setOpen(false)}>
-                      <Button
-                        variant={isActive ? "default" : "ghost"}
-                        className="w-full justify-start gap-3">
-                        <item.icon className="w-5 h-5" />
-                        {item.label}
-                      </Button>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </SheetContent>
-          </Sheet>
-        </div>
+              <span className="font-bold text-lg">БҮХ</span>
+            </div>
+            <nav className="flex flex-col gap-2">
+              {navItems.map((item) => {
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path !== "/home" &&
+                    item.path !== "/profile" &&
+                    location.pathname.startsWith(item.path));
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setOpen(false)}>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      className="w-full justify-start gap-3">
+                      <item.icon className="w-5 h-5" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                );
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );
