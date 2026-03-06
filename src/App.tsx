@@ -76,6 +76,7 @@ function AppContent() {
         <BrowserRouter>
           <Routes>
             {/* Onboarding */}
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
 
@@ -93,7 +94,6 @@ function AppContent() {
             <Route path="/orders/:id" element={<OrderDetail />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/search" element={<Search />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/chat/:id" element={<ChatDetail />} />
             <Route path="/checkout" element={<Checkout />} />
 
