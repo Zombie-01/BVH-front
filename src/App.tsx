@@ -77,7 +77,6 @@ function AppContent() {
             {/* Onboarding */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-
             {/* User Routes */}
             <Route path="/home" element={<Home />} />
             <Route path="/stores" element={<Stores />} />
@@ -94,20 +93,17 @@ function AppContent() {
             <Route path="/search" element={<Search />} />
             <Route path="/chat/:id" element={<ChatDetail />} />
             <Route path="/checkout" element={<Checkout />} />
-
             {/* Driver Routes */}
             <Route path="/driver/tasks" element={<DriverTasks />} />
             <Route path="/driver/tasks/:id" element={<DriverTasks />} />
             <Route path="/driver/map" element={<DriverMap />} />
             <Route path="/driver/completed" element={<DriverCompleted />} />
             <Route path="/driver/earnings" element={<DriverEarnings />} />
-
             {/* Service Worker Routes */}
             <Route path="/worker/jobs" element={<WorkerJobs />} />
             <Route path="/worker/quotes" element={<WorkerQuotes />} />
             <Route path="/worker/milestones" element={<WorkerMilestones />} />
             <Route path="/worker/ratings" element={<WorkerRatings />} />
-
             {/* Store Owner Routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
             <Route path="/owner/products" element={<OwnerProducts />} />
@@ -115,11 +111,18 @@ function AppContent() {
             <Route path="/owner/orders/:id" element={<OwnerOrders />} />
             <Route path="/owner/chats" element={<OwnerChats />} />
             <Route path="/owner/chats/:id" element={<OwnerChatDetail />} />
-
             {/* Service Worker Chat Route */}
             <Route path="/worker/chats/:id" element={<WorkerChatDetail />} />
-
-            {/* Catch-all */}
+            {/* Catch-all */}{" "}
+            <Route
+              path="/privacy-policy"
+              element={
+                <iframe
+                  src="/privacy-policy.html"
+                  style={{ width: "100%", height: "100vh", border: "none" }}
+                />
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
