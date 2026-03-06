@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "vite build",
+    "build:native": "CAPACITOR_PLATFORM=true vite build",
+    "build:android": "CAPACITOR_PLATFORM=android vite build",
+    "build:ios": "CAPACITOR_PLATFORM=ios vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
