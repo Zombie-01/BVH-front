@@ -12,6 +12,10 @@ export type Platform =
   | "capacitor"
   | "unknown";
 
+// helper to check runtime environment
+const isBrowser = (): boolean =>
+  typeof window !== "undefined" && typeof navigator !== "undefined";
+
 // Detect current platform
 const detectPlatform = (): Platform => {
   const ua = navigator.userAgent.toLowerCase();
@@ -58,6 +62,10 @@ export function useInstallPrompt() {
 
   // Check if app is already installed
   const checkIfInstalled = () => {
+    if (!isBrowser()) {
+      setIsInstalled(false);
+      return;
+    }
     // Check for standalone mode (PWA displayed as standalone app)
     if (window.matchMedia("(display-mode: standalone)").matches) {
       console.log("✓ PWA: App is in standalone mode (installed)");
@@ -159,7 +167,9 @@ export function useInstallPrompt() {
 
   const openInBrowser = () => {
     console.log("ℹ PWA: Opening in external browser");
-    window.open(window.location.href, "_blank");
+    if (typeof window !== "undefined") {
+      window.open(window.location.href, "_blank");
+    }
   };
 
   return {

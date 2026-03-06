@@ -41,7 +41,11 @@ export function IndexInstallPrompt() {
           size="sm"
           variant="outline"
           className="flex-1 h-12 rounded-xl font-medium gap-2"
-          onClick={() => (window.location.href = "/auth")}>
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.location.href = "/auth";
+            }
+          }}>
           <Globe className="w-4 h-4" />
           <span>Үргэлжүүлэх</span>
         </Button>

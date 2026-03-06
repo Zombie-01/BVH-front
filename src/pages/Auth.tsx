@@ -110,7 +110,8 @@ export default function Auth() {
 
     try {
       if (mode === "signup") {
-        const redirectUrl = `${window.location.origin}/`;
+        const redirectUrl =
+          typeof window !== "undefined" ? `${window.location.origin}/` : "/";
         const metadata: Record<string, string | null> = {
           name: name || "Хэрэглэгч",
           phone: phone || null,
@@ -191,10 +192,12 @@ export default function Auth() {
   const handleGoogleAuth = async () => {
     setGoogleLoading(true);
     try {
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${origin}/`,
         },
       });
 

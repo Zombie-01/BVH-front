@@ -20,6 +20,7 @@ import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Search from "./pages/Search";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 // User Detail Pages
 import StoreDetail from "./pages/user/StoreDetail";
@@ -92,6 +93,7 @@ function AppContent() {
             <Route path="/orders/:id" element={<OrderDetail />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/chat/:id" element={<ChatDetail />} />
             <Route path="/checkout" element={<Checkout />} />
 

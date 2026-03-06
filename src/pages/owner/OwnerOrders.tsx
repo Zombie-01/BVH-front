@@ -242,7 +242,9 @@ export default function OwnerOrders() {
       // refresh
       // re-use the fetch logic by calling the effect - simple approach: reload all
       const evt = new Event("reloadOrders");
-      window.dispatchEvent(evt);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(evt);
+      }
     } catch (err) {
       console.error("Create order failed:", err);
       toast.error("Захиалга үүсгэхэд алдаа гарлаа");
@@ -297,8 +299,6 @@ export default function OwnerOrders() {
     }
   };
 
-
-
   const handleQuickConfirm = (orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     handleUpdateStatus(orderId, "confirmed");
@@ -307,12 +307,20 @@ export default function OwnerOrders() {
   // listen for manual reload event (used after create)
   useEffect(() => {
     const onReload = () => {
-      // re-run load by toggling user (cheap way: reload page) or better, call loadOrders directly
-      // For now, re-run load via simple page re-fetch
-      window.location.reload();
+      if (typeof window !== "undefined") {
+        // re-run load by toggling user (cheap way: reload page) or better, call loadOrders directly
+        // For now, re-run load via simple page re-fetch
+        window.location.reload();
+      }
     };
-    window.addEventListener("reloadOrders", onReload);
-    return () => window.removeEventListener("reloadOrders", onReload);
+    if (typeof window !== "undefined") {
+      window.addEventListener("reloadOrders", onReload);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("reloadOrders", onReload);
+      }
+    };
   }, []);
 
   return (
@@ -485,7 +493,6 @@ export default function OwnerOrders() {
                       <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   )}
-                
                 </div>
               </motion.div>
             );
