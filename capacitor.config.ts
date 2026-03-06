@@ -1,15 +1,21 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.narmandakh.buh",
-  appName: "Барилгын Үйлчилгээний Хүргэлт",
+  appId: "com.buh.app",
+  appName: "БҮХ",
   webDir: "dist",
   bundledWebRuntime: false,
+  server: {
+    androidScheme: "https",
+  },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 3000,
-      splashFullScreen: true,
-      backgroundColor: "#ffffffff",
+      launchShowDuration: 2500,
+      launchAutoHide: true,
+      backgroundColor: "#ffffff",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: false,
+      splashImmersive: true,
     },
   },
 };
