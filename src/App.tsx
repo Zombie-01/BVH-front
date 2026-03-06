@@ -20,7 +20,6 @@ import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Search from "./pages/Search";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 // User Detail Pages
 import StoreDetail from "./pages/user/StoreDetail";
@@ -76,7 +75,6 @@ function AppContent() {
         <BrowserRouter>
           <Routes>
             {/* Onboarding */}
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
 
