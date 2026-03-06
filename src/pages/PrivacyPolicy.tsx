@@ -197,9 +197,9 @@ const PrivacyPolicy: React.FC = () => {
           If you have any questions about this Privacy Policy, please contact us
           at:
         </p>
-        <p>Email: [Your Email Address]</p>
-        <p>Phone: [Your Phone Number]</p>
-        <p>Address: [Your Business Address]</p>
+        <p>Email: narmandakhurnukh@gmail.com</p>
+        <p>Phone: 88270742</p>
+        <p>Address: Sbd 11r horoo Hurd tow 4-403toot</p>
       </section>
     </div>
   );
