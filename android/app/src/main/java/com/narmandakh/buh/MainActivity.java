@@ -1,4 +1,4 @@
-package com.narmandakh.app;
+package com.narmandakh.buh;
 
 import com.getcapacitor.BridgeActivity;
 

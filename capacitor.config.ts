@@ -1,13 +1,8 @@
-import type { CapacitorConfig } from "@capacitor/cli";
-
-const config: CapacitorConfig = {
-  appId: "com.buh.app",
+const config = {
+  appId: "com.narmandakh.buh",
   appName: "БҮХ",
   webDir: "dist",
   bundledWebRuntime: false,
-  server: {
-    androidScheme: "https",
-  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2500,

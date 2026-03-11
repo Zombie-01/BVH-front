@@ -2,8 +2,6 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Package, Truck, Wrench, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { IndexInstallPrompt } from "@/components/IndexInstallPrompt";
-import { MessengerRedirect } from "@/components/MessengerRedirect";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -16,7 +14,6 @@ const Index = () => {
 
   return (
     <>
-      <MessengerRedirect />
       <div
         className="
   relative overflow-hidden flex flex-col
@@ -92,7 +89,6 @@ const Index = () => {
 
             {/* CTA Desktop */}
             <div className="hidden lg:block mt-10 space-y-4">
-              <IndexInstallPrompt />
               <Button
                 size="lg"
                 className="w-full h-14 px-10 rounded-2xl text-base font-medium"
@@ -128,7 +124,6 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="p-6 lg:hidden space-y-4">
-          <IndexInstallPrompt />
           <Button
             size="sm"
             className="w-full h-14 rounded-2xl text-base font-medium"

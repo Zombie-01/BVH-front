@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BUH</string>
-    <string name="title_activity_main">BUH</string>
-    <string name="package_name">com.narmandakh.app</string>
-    <string name="custom_url_scheme">com.narmandakh.app</string>
+    <string name="app_name">БҮХ</string>
+    <string name="title_activity_main">БҮХ</string>
+    <string name="package_name">com.narmandakh.buh</string>
+    <string name="custom_url_scheme">com.narmandakh.buh</string>
 </resources>
