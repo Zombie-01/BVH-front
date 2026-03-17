@@ -145,6 +145,8 @@ CREATE TABLE public.orders (
   agreed_price NUMERIC(12, 2),
   total_amount NUMERIC(12, 2),
   delivery_address TEXT,
+  delivery_lat NUMERIC(10, 8),
+  delivery_lng NUMERIC(11, 8),
   service_description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   confirmed_at TIMESTAMP WITH TIME ZONE,

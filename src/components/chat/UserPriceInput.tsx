@@ -68,8 +68,8 @@ export function UserPriceInput({
         </Button>
       </div>
 
-      <div className="flex gap-2 mt-3">
-        {[0.95, 0.9, 0.85].map((multiplier) => {
+      <div className="flex gap-2 mt-3 overflow-hidden">
+        {[0.9, 0.85].map((multiplier) => {
           const discountPrice = Math.round(suggestedPrice * multiplier);
           return (
             <Button

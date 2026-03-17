@@ -16,8 +16,9 @@ import type {
   TablesInsert,
   TablesUpdate,
 } from "@/integrations/supabase/types";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -77,6 +78,7 @@ export default function OwnerProducts() {
         const { data: prods, error: prodErr } = await supabase
           .from("products")
           .select("*")
+          .eq("store_id", sid)
           .order("created_at", { ascending: false });
         if (prodErr) throw prodErr;
         if (prods) {
@@ -100,9 +102,17 @@ export default function OwnerProducts() {
           .select("id, name")
           .order("name", { ascending: true });
         if (catErr) throw catErr;
-        if (cats && cats.length > 0) {
+        if (
+          cats &&
+          cats.length > 0 &&
+          storeData &&
+          storeData.categories?.length > 0
+        ) {
           setStoreCategories(cats);
-          setProductCategories(["all", ...cats.map((cat: any) => cat.id)]);
+          setProductCategories([
+            "all",
+            ...storeData.categories.map((cat: any) => cat),
+          ]);
         } else {
           setStoreCategories([]);
           setProductCategories(["all"]);
@@ -139,7 +149,72 @@ export default function OwnerProducts() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="px-4 py-6 max-w-7xl mx-auto">Татаж байна...</div>
+        {/* Header Skeleton */}
+        <header className="bg-card border-b border-border pt-safe px-4 pb-4">
+          <div className="pt-4 max-w-7xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-8 w-32 mb-2" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+              <Skeleton className="h-11 w-20" />
+            </div>
+
+            {/* Search & Filter Skeleton */}
+            <div className="mt-4 flex gap-2">
+              <Skeleton className="flex-1 h-11" />
+              <Skeleton className="h-11 w-11" />
+            </div>
+          </div>
+        </header>
+
+        {/* Stats Skeleton */}
+        <section className="px-4 py-4 max-w-7xl mx-auto">
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-card rounded-xl p-3 text-center shadow-card">
+                <Skeleton className="h-6 w-8 mx-auto mb-1" />
+                <Skeleton className="h-3 w-16 mx-auto" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Category Filter Skeleton */}
+        <section className="px-4 pb-4 max-w-7xl mx-auto">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-8 w-20 rounded-full" />
+            ))}
+          </div>
+        </section>
+
+        {/* Products Grid Skeleton */}
+        <section className="px-4 pb-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div
+                key={i}
+                className="bg-card rounded-2xl overflow-hidden shadow-card">
+                <Skeleton className="w-full h-40" />
+                <div className="p-4">
+                  <Skeleton className="h-5 w-3/4 mb-2" />
+                  <Skeleton className="h-3 w-full mb-1" />
+                  <Skeleton className="h-3 w-2/3 mb-3" />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Skeleton className="h-4 w-16 mb-1" />
+                      <Skeleton className="h-3 w-8" />
+                    </div>
+                    <Skeleton className="h-6 w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </AppLayout>
     );
   }
@@ -451,6 +526,7 @@ export default function OwnerProducts() {
         onOpenChange={setProductModalOpen}
         product={selectedProduct}
         onSave={handleSaveProduct}
+        getCategoryName={getCategoryName}
         categories={categories.filter((c) => c !== "all")}
       />
 

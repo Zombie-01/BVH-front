@@ -21,6 +21,7 @@ import { ServiceWorkerCard } from "@/components/common/ServiceWorkerCard";
 import { CategoryPill } from "@/components/common/CategoryPill";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const quickActions = [
   { id: "order", label: "Бараа захиалах", icon: Package, color: "bg-primary" },
@@ -33,6 +34,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   // Data will be fetched from Supabase
   const [featuredStores, setFeaturedStores] = useState<any[]>([]);
@@ -86,8 +88,118 @@ export default function Home() {
             })),
           ]);
         }
+        setIsLoading(false);
       });
   }, []);
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        {/* Header */}
+        <header className="bg-gradient-to-br from-primary via-primary to-orange-400 pt-safe px-4 pb-6">
+          <div className="pt-4 flex items-center justify-between">
+            <div>
+              <Skeleton className="h-4 w-24 mb-1" />
+              <Skeleton className="h-6 w-32" />
+            </div>
+            <Skeleton className="w-10 h-10 rounded-full" />
+          </div>
+
+          {/* Search Bar */}
+          <div className="mt-4 relative">
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+
+          {/* Location */}
+          <div className="mt-3 flex items-center gap-1">
+            <Skeleton className="w-4 h-4" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </header>
+
+        {/* Quick Actions Skeleton */}
+        <section className="px-4 -mt-3 max-w-7xl mx-auto">
+          <div className="bg-card rounded-2xl shadow-elevated p-4 lg:p-6">
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-6">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-2 p-3 lg:p-4 rounded-xl">
+                  <Skeleton className="w-12 h-12 lg:w-14 lg:h-14 rounded-xl" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Categories Skeleton */}
+        <section className="mt-6">
+          <div className="px-4 flex items-center justify-between mb-3">
+            <Skeleton className="h-6 w-24" />
+          </div>
+          <div className="flex gap-2 px-4 overflow-x-auto scrollbar-hide pb-2">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton
+                key={i}
+                className="h-8 w-20 rounded-full flex-shrink-0"
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Featured Stores Skeleton */}
+        <section className="mt-6">
+          <div className="px-4 flex items-center justify-between mb-3">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+          <div className="flex gap-4 px-4 overflow-x-auto scrollbar-hide pb-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex-shrink-0">
+                <div className="bg-card rounded-2xl p-4 shadow-card w-64">
+                  <Skeleton className="w-full h-32 rounded-xl mb-3" />
+                  <Skeleton className="h-5 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-full mb-1" />
+                  <Skeleton className="h-4 w-2/3 mb-3" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Top Service Workers Skeleton */}
+        <section className="mt-6 px-4 pb-6">
+          <div className="flex items-center justify-between mb-3">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-card rounded-2xl p-4 shadow-card">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-24 mb-1" />
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

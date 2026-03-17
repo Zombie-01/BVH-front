@@ -239,9 +239,10 @@ export default function OwnerDashboard() {
         style={{
           backgroundImage: `url(${ownerStore?.image})`,
         }}
-        className="bg-cover bg-center pt-safe px-4 pb-6 lg:rounded-b-3xl relative">
-        <div className="pt-4 max-w-7xl mx-auto">
-          <div className="flex py-6 items-center justify-between">
+        className="bg-cover bg-center pt-safe  px-4 pb-6 lg:rounded-b-3xl relative">
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="pt-4 max-w-7xl mx-auto relative z-10">
+          <div className="flex py-6 items-center  justify-between">
             <div>
               <p className="text-white/80 text-sm">Сайн байна уу 🏪</p>
               <h1 className="text-2xl font-bold text-white">
@@ -280,10 +281,10 @@ export default function OwnerDashboard() {
                     {stat.label === "Өнөөдрийн борлуулалт"
                       ? `₮${(todayRevenue / 1000).toFixed(1)}K`
                       : stat.label === "Захиалга"
-                        ? ordersCount
-                        : stat.label === "Шинэ чат"
-                          ? newChatsCount
-                          : (stat.value ?? "—")}
+                      ? ordersCount
+                      : stat.label === "Шинэ чат"
+                      ? newChatsCount
+                      : stat.value ?? "—"}
                   </span>
                   <span
                     className={cn(

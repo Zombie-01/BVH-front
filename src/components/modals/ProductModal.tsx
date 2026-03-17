@@ -35,16 +35,10 @@ interface ProductModalProps {
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
   onSave: (product: Product) => void;
+  getCategoryName?: (categoryId: string) => string; // optional function to get category name from ID
   categories?: string[]; // categories provided by parent (store categories)
 }
 
-const categories = [
-  "Барилгын материал",
-  "Цахилгаан",
-  "Сантехник",
-  "Өнгө будаг",
-  "Багаж хэрэгсэл",
-];
 const units = ["ширхэг", "кг", "м", "м²", "м³", "литр", "уут"];
 
 export function ProductModal({
@@ -53,6 +47,7 @@ export function ProductModal({
   product,
   onSave,
   categories: categoriesProp,
+  getCategoryName,
 }: ProductModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Product>({
@@ -303,7 +298,7 @@ export function ProductModal({
               <SelectContent>
                 {(categoriesProp || []).map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat}
+                    {getCategoryName(cat)}
                   </SelectItem>
                 ))}
               </SelectContent>

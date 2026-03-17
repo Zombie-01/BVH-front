@@ -10,12 +10,14 @@ import { CategoryPill } from "@/components/common/CategoryPill";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { ServiceWorker } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Services() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [workers, setWorkers] = useState<ServiceWorker[]>([]);
   const [categories, setCategories] = useState<
@@ -79,6 +81,8 @@ export default function Services() {
         setCategories(cats);
       } catch (err) {
         console.error("Failed to load workers:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -156,21 +160,47 @@ export default function Services() {
       {/* Workers List */}
       <section className="px-4 lg:px-6 pb-6 max-w-7xl mx-auto">
         <p className="text-sm text-muted-foreground mb-4">
-          {filteredWorkers.length} мэргэжилтэн олдлоо
+          {isLoading
+            ? "Татаж байна..."
+            : `${filteredWorkers.length} мэргэжилтэн олдлоо`}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredWorkers.map((worker, index) => (
-            <motion.div
-              key={worker.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * Math.min(index, 8) }}>
-              <ServiceWorkerCard
-                worker={worker}
-                onClick={() => navigate(`/services/${worker.id}`)}
-              />
-            </motion.div>
-          ))}
+          {isLoading
+            ? // Show skeleton cards while loading
+              Array.from({ length: 8 }).map((_, index) => (
+                <motion.div
+                  key={`skeleton-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * index }}
+                  className="bg-card rounded-2xl p-4 shadow-card">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-12 h-12 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-24 mb-1" />
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                </motion.div>
+              ))
+            : // Show actual worker cards when loaded
+              filteredWorkers.map((worker, index) => (
+                <motion.div
+                  key={worker.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * Math.min(index, 8) }}>
+                  <ServiceWorkerCard
+                    worker={worker}
+                    onClick={() => navigate(`/services/${worker.id}`)}
+                  />
+                </motion.div>
+              ))}
         </div>
       </section>
     </AppLayout>

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { StoreCard } from "@/components/common/StoreCard";
 import { supabase } from "@/integrations/supabase/client";
 import type { Store, Product } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Search() {
   const navigate = useNavigate();
@@ -120,9 +121,49 @@ export default function Search() {
         )}
 
         {loading && (
-          <p className="text-center text-muted-foreground mt-10">
-            Хайж байна...
-          </p>
+          <div className="space-y-6">
+            {/* Stores Skeleton */}
+            <section>
+              <Skeleton className="h-6 w-24 mb-3" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-card rounded-2xl overflow-hidden shadow-card">
+                    <Skeleton className="w-full h-40" />
+                    <div className="p-4">
+                      <Skeleton className="h-5 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-2/3 mb-3" />
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-6 w-16 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Products Skeleton */}
+            <section>
+              <Skeleton className="h-6 w-32 mb-3" />
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-card rounded-xl p-3 border border-border flex gap-3 w-full">
+                    <Skeleton className="w-20 h-20 rounded-lg" />
+                    <div className="flex-1 min-w-0">
+                      <Skeleton className="h-5 w-3/4 mb-1" />
+                      <Skeleton className="h-4 w-20 mb-1" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
         )}
 
         {!loading &&

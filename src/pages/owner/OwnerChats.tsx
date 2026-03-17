@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +17,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChatPreview {
   id: string;
@@ -42,8 +44,10 @@ export default function OwnerChats() {
   const { user, profile } = useAuth();
 
   const [chats, setChats] = useState<ChatPreview[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
     async function loadChats() {
+      setIsLoading(true);
       try {
         const ownerId = profile?.id ?? user?.id;
         if (!ownerId) return;
@@ -103,6 +107,8 @@ export default function OwnerChats() {
         setChats(mapped);
       } catch (err) {
         console.error("Failed to load chats:", err);
+      } finally {
+        setIsLoading(false);
       }
     }
 
@@ -127,6 +133,68 @@ export default function OwnerChats() {
   const negotiatingCount = chats.filter(
     (c) => c.status === "negotiating",
   ).length;
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        {/* Header Skeleton */}
+        <header className="bg-card border-b border-border pt-safe px-4 pb-4">
+          <div className="pt-4 max-w-7xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-8 w-24 mb-2" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+
+            {/* Search Skeleton */}
+            <div className="mt-4 relative">
+              <Skeleton className="h-11 w-full" />
+            </div>
+          </div>
+        </header>
+
+        {/* Filter Skeleton */}
+        <section className="px-4 py-4 max-w-7xl mx-auto">
+          <div className="flex gap-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-8 w-24 rounded-full" />
+            ))}
+          </div>
+        </section>
+
+        {/* Chats List Skeleton */}
+        <section className="px-4 pb-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-card rounded-2xl p-4 shadow-card">
+                <div className="flex items-start gap-3">
+                  <div className="relative flex-shrink-0">
+                    <Skeleton className="w-14 h-14 rounded-full" />
+                    <Skeleton className="absolute -top-1 -right-1 w-6 h-6 rounded-full" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-full mt-1" />
+                    <Skeleton className="h-3 w-3/4 mt-2" />
+                    <div className="mt-2 flex items-center justify-between">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-3 w-12" />
+                    </div>
+                  </div>
+                  <Skeleton className="w-5 h-5 flex-shrink-0" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

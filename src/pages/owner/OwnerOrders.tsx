@@ -21,6 +21,7 @@ import { OrderModal } from "@/components/modals/OrderModal";
 import { cn } from "@/lib/utils";
 import { OrderStatus } from "@/types";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -182,6 +183,8 @@ export default function OwnerOrders() {
     items: { name: string; quantity: number; price: number }[];
     status: OrderStatus;
     deliveryAddress: string;
+    deliveryLat?: number;
+    deliveryLng?: number;
     notes?: string;
   }) => {
     try {
@@ -212,6 +215,8 @@ export default function OwnerOrders() {
             0,
           ),
           delivery_address: orderData.deliveryAddress,
+          delivery_lat: orderData.deliveryLat,
+          delivery_lng: orderData.deliveryLng,
         } as Database["public"]["Tables"]["orders"]["Insert"])
         .select()
         .maybeSingle()) as {
@@ -322,6 +327,101 @@ export default function OwnerOrders() {
       }
     };
   }, []);
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        {/* Header Skeleton */}
+        <header className="bg-card border-b border-border pt-safe px-4 pb-4">
+          <div className="pt-4 max-w-7xl mx-auto flex items-start justify-between">
+            <div>
+              <Skeleton className="h-8 w-32 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </header>
+
+        {/* Stats Skeleton */}
+        <section className="px-4 py-4 max-w-7xl mx-auto">
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-primary/10 rounded-xl p-4 text-center">
+                <Skeleton className="h-8 w-8 mx-auto mb-2" />
+                <Skeleton className="h-3 w-16 mx-auto" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Filter Skeleton */}
+        <section className="px-4 pb-4 max-w-7xl mx-auto">
+          <div className="flex gap-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-8 w-20 rounded-full" />
+            ))}
+          </div>
+        </section>
+
+        {/* Orders List Skeleton */}
+        <section className="px-4 pb-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-card rounded-2xl p-4 shadow-card">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-12 h-12 rounded-full" />
+                    <div>
+                      <Skeleton className="h-5 w-24 mb-1" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+
+                {/* Items */}
+                <div className="mt-3 p-3 bg-muted rounded-xl">
+                  {[1, 2].map((j) => (
+                    <div
+                      key={j}
+                      className="flex items-center justify-between text-sm mb-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  ))}
+                  <div className="mt-2 pt-2 border-t border-border flex items-center justify-between">
+                    <Skeleton className="h-4 w-8" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                </div>
+
+                {/* Delivery Address */}
+                <div className="mt-3 flex items-center gap-2">
+                  <Skeleton className="w-4 h-4" />
+                  <Skeleton className="h-4 w-48" />
+                </div>
+
+                {/* Driver Info */}
+                <div className="mt-2 flex items-center gap-2">
+                  <Skeleton className="w-4 h-4" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+
+                {/* Actions */}
+                <div className="mt-4 flex gap-2">
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

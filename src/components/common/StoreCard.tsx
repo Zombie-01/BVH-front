@@ -39,7 +39,7 @@ export function StoreCard({
             "px-2 py-1 rounded-full text-2xs font-medium",
             store.isOpen
               ? "bg-success/10 text-success"
-              : "bg-muted text-muted-foreground"
+              : "bg-muted text-muted-foreground",
           )}>
           {store.isOpen ? "Нээлттэй" : "Хаалттай"}
         </div>
@@ -57,14 +57,14 @@ export function StoreCard({
           alt={store.name}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-secondary/90 via-secondary/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-4 text-left">
           <div
             className={cn(
               "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium mb-2",
               store.isOpen
                 ? "bg-success text-success-foreground"
-                : "bg-muted text-muted-foreground"
+                : "bg-muted text-muted-foreground",
             )}>
             <Clock className="w-3 h-3" />
             {store.isOpen ? "Нээлттэй" : "Хаалттай"}
@@ -104,7 +104,7 @@ export function StoreCard({
             "absolute top-3 right-3 px-2 py-1 rounded-full text-2xs font-medium",
             store.isOpen
               ? "bg-success text-success-foreground"
-              : "bg-muted text-muted-foreground"
+              : "bg-muted text-muted-foreground",
           )}>
           {store.isOpen ? "Нээлттэй" : "Хаалттай"}
         </div>

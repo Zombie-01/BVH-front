@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { User, Settings, LogOut, Star, Phone } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import EditProfileModal from "@/components/modals/EditProfileModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,6 +106,91 @@ export default function Profile() {
     loadStats();
   }, [user, userRole?.role]);
 
+  if (isLoading || isFetching) {
+    return (
+      <AppLayout>
+        {/* Header Skeleton */}
+        <header className="bg-gradient-to-br from-primary via-primary to-orange-400 pt-safe px-4 pb-8">
+          <div className="pt-4 flex items-center justify-between">
+            <Skeleton className="h-6 w-20 bg-white/20" />
+            <Skeleton className="w-10 h-10 rounded-full bg-white/20" />
+          </div>
+
+          {/* Profile Card Skeleton */}
+          <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-20 h-20 rounded-2xl bg-white/20" />
+              <div className="flex-1">
+                <Skeleton className="h-6 w-32 mb-2 bg-white/20" />
+                <div className="flex items-center gap-2 mt-1">
+                  <Skeleton className="w-4 h-4 bg-white/20" />
+                  <Skeleton className="h-4 w-24 bg-white/20" />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Skeleton className="h-5 w-12 rounded-full bg-white/20" />
+                  <Skeleton className="h-4 w-16 bg-white/20" />
+                </div>
+              </div>
+              <Skeleton className="h-9 w-16 rounded-md bg-white/20" />
+            </div>
+          </div>
+        </header>
+
+        {/* Stats Skeleton */}
+        <section className="px-4 -mt-4">
+          <div className="bg-card rounded-2xl shadow-elevated p-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <Skeleton className="h-8 w-8 mx-auto mb-1" />
+                <Skeleton className="h-3 w-12 mx-auto" />
+              </div>
+              <div className="text-center border-x border-border">
+                <Skeleton className="h-8 w-8 mx-auto mb-1" />
+                <Skeleton className="h-3 w-16 mx-auto" />
+              </div>
+              <div className="text-center">
+                <Skeleton className="h-8 w-6 mx-auto mb-1" />
+                <Skeleton className="h-3 w-12 mx-auto" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Profile Details Skeleton */}
+        <section className="px-4 mt-6">
+          <div className="bg-card rounded-2xl shadow-card p-4">
+            <Skeleton className="h-6 w-32 mb-3" />
+            <div className="grid grid-cols-1 gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Skeleton className="h-3 w-8 mb-1" />
+                  <Skeleton className="h-5 w-24 mb-1" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <div>
+                <Skeleton className="h-3 w-6 mb-1" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+              <div>
+                <Skeleton className="h-3 w-8 mb-1" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <div className="pt-4">
+                <Skeleton className="h-10 w-32 rounded-md" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Logout Skeleton */}
+        <section className="px-4 mt-6 pb-6">
+          <Skeleton className="h-12 w-full rounded-lg" />
+        </section>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       {/* Header */}
@@ -151,11 +237,6 @@ export default function Profile() {
                     "+976 9911 2233"}
                 </span>
               </div>
-              {isLoading && (
-                <div className="mt-2 text-sm text-white/70">
-                  Ачааллаж байна…
-                </div>
-              )}
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex items-center gap-1 bg-accent/20 px-2 py-0.5 rounded-full">
                   <Star className="w-3.5 h-3.5 text-accent" />

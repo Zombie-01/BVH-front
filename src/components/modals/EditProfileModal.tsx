@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,11 @@ export default function EditProfileModal({
     Database["public"]["Tables"]["service_workers"]["Row"]
   > | null>(null);
   const [storeImageFile, setStoreImageFile] = useState<File | null>(null);
+  const [storeImageUrl, setStoreImageUrl] = useState<string | null>(null);
+
+  // File input refs
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const storeImageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setName(initialData?.name ?? "");
@@ -82,7 +87,10 @@ export default function EditProfileModal({
             | Database["public"]["Tables"]["stores"]["Row"]
             | null;
           setStore(storeRow ?? null);
-          if (storeRow && storeRow.image) setStoreImageFile(null); // leave as url
+          if (storeRow && storeRow.image) {
+            setStoreImageFile(null);
+            setStoreImageUrl(storeRow.image);
+          }
         } catch (e) {
           console.error("Failed to load store:", e);
         }
@@ -130,6 +138,10 @@ export default function EditProfileModal({
 
   const handleStoreImageChange = (f: File | null) => {
     setStoreImageFile(f);
+    if (!f) return setStoreImageUrl(store?.image ?? null);
+    const reader = new FileReader();
+    reader.onloadend = () => setStoreImageUrl(reader.result as string);
+    reader.readAsDataURL(f);
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -257,7 +269,7 @@ export default function EditProfileModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="">
+      <DialogContent className="w-[95vw] sm:max-w-sm md:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Профайлыг засах</DialogTitle>
         </DialogHeader>
@@ -265,9 +277,12 @@ export default function EditProfileModal({
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           {/* Avatar */}
           <div>
-            <Label>Аватар</Label>
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-muted overflow-hidden">
+            <Label className="block mb-2">Аватар</Label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="w-20 h-20 rounded-2xl bg-muted overflow-hidden hover:opacity-80 transition flex-shrink-0">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -275,18 +290,32 @@ export default function EditProfileModal({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-lg">
                     А
                   </div>
                 )}
+              </button>
+              <div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    handleAvatarChange(e.target.files?.[0] ?? null)
+                  }
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => avatarInputRef.current?.click()}>
+                  Сонгох
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG, GIF
+                </p>
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  handleAvatarChange(e.target.files?.[0] ?? null)
-                }
-              />
             </div>
           </div>
 
@@ -331,104 +360,172 @@ export default function EditProfileModal({
           )}
 
           {userRole === "store_owner" && (
-            <div className="space-y-2">
-              <Label>Дэлгүүр мэдээлэл</Label>
-              <Input
-                value={store?.name ?? ""}
-                onChange={(e) =>
-                  setStore({ ...(store ?? {}), name: e.target.value })
-                }
-                placeholder="Дэлгүүрийн нэр"
-              />
-              <Input
-                value={store?.phone ?? ""}
-                onChange={(e) =>
-                  setStore({ ...(store ?? {}), phone: e.target.value })
-                }
-                placeholder="Дэлгүүрийн утас"
-              />
-              <Textarea
-                value={store?.description ?? ""}
-                onChange={(e) =>
-                  setStore({ ...(store ?? {}), description: e.target.value })
-                }
-                placeholder="Тайлбар"
-              />
-
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="block font-semibold">Дэлгүүр мэдээлэл</Label>
               <div>
-                <Label>Дэлгүүр зураг</Label>
-                <div className="flex items-center gap-3">
-                  <div className="w-20 h-20 rounded-lg bg-muted overflow-hidden">
-                    {store?.image ? (
+                <Label htmlFor="store-name" className="text-sm">
+                  Дэлгүүрийн нэр
+                </Label>
+                <Input
+                  id="store-name"
+                  value={store?.name ?? ""}
+                  onChange={(e) =>
+                    setStore({ ...(store ?? {}), name: e.target.value })
+                  }
+                  placeholder="Дэлгүүрийн нэр"
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-phone" className="text-sm">
+                  Дэлгүүрийн утас
+                </Label>
+                <Input
+                  id="store-phone"
+                  value={store?.phone ?? ""}
+                  onChange={(e) =>
+                    setStore({ ...(store ?? {}), phone: e.target.value })
+                  }
+                  placeholder="Дэлгүүрийн утас"
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-desc" className="text-sm">
+                  Тайлбар
+                </Label>
+                <Textarea
+                  id="store-desc"
+                  value={store?.description ?? ""}
+                  onChange={(e) =>
+                    setStore({ ...(store ?? {}), description: e.target.value })
+                  }
+                  placeholder="Тайлбар"
+                />
+              </div>
+
+              <div className="pt-2">
+                <Label className="block mb-2 font-semibold">
+                  Дэлгүүр зураг
+                </Label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => storeImageInputRef.current?.click()}
+                    className="w-24 h-24 rounded-lg bg-muted overflow-hidden hover:opacity-80 transition flex-shrink-0">
+                    {storeImageUrl ? (
+                      <img
+                        src={storeImageUrl}
+                        alt="store"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : store?.image ? (
                       <img
                         src={store.image}
                         alt="store"
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-lg">
                         З
                       </div>
                     )}
+                  </button>
+                  <div>
+                    <input
+                      ref={storeImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        handleStoreImageChange(e.target.files?.[0] ?? null)
+                      }
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => storeImageInputRef.current?.click()}>
+                      Сонгох
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PNG, JPG, GIF
+                    </p>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      handleStoreImageChange(e.target.files?.[0] ?? null)
-                    }
-                  />
                 </div>
               </div>
             </div>
           )}
 
           {userRole === "service_worker" && (
-            <div className="space-y-2">
-              <Label>Үйлчилгээ мэдээлэл</Label>
-              <Input
-                value={worker?.specialty ?? ""}
-                onChange={(e) =>
-                  setWorker({ ...(worker ?? {}), specialty: e.target.value })
-                }
-                placeholder="Мэргэжил"
-              />
-              <Input
-                value={
-                  worker?.hourly_rate !== null &&
-                  worker?.hourly_rate !== undefined
-                    ? String(worker.hourly_rate)
-                    : ""
-                }
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setWorker({
-                    ...(worker ?? {}),
-                    hourly_rate: v === "" ? null : Number(v),
-                  });
-                }}
-                placeholder="₮ цагийн үнэ"
-                type="number"
-              />
-              <Textarea
-                value={worker?.description ?? ""}
-                onChange={(e) =>
-                  setWorker({ ...(worker ?? {}), description: e.target.value })
-                }
-                placeholder="Тайлбар"
-              />
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="block font-semibold">Үйлчилгээ мэдээлэл</Label>
+              <div>
+                <Label htmlFor="specialty" className="text-sm">
+                  Мэргэжил
+                </Label>
+                <Input
+                  id="specialty"
+                  value={worker?.specialty ?? ""}
+                  onChange={(e) =>
+                    setWorker({ ...(worker ?? {}), specialty: e.target.value })
+                  }
+                  placeholder="Мэргэжил"
+                />
+              </div>
+              <div>
+                <Label htmlFor="hourly-rate" className="text-sm">
+                  ₮ цагийн үнэ
+                </Label>
+                <Input
+                  id="hourly-rate"
+                  value={
+                    worker?.hourly_rate !== null &&
+                    worker?.hourly_rate !== undefined
+                      ? String(worker.hourly_rate)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setWorker({
+                      ...(worker ?? {}),
+                      hourly_rate: v === "" ? null : Number(v),
+                    });
+                  }}
+                  placeholder="0"
+                  type="number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="worker-desc" className="text-sm">
+                  Тайлбар
+                </Label>
+                <Textarea
+                  id="worker-desc"
+                  value={worker?.description ?? ""}
+                  onChange={(e) =>
+                    setWorker({
+                      ...(worker ?? {}),
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Тайлбар"
+                />
+              </div>
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t">
             <Button
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              type="button">
+              type="button"
+              className="w-full sm:w-auto">
               Болих
             </Button>
-            <Button type="submit" disabled={isSaving}>
-              Хадгалах
+            <Button
+              type="submit"
+              disabled={isSaving}
+              className="w-full sm:w-auto">
+              {isSaving ? "Хадгалж байна..." : "Хадгалах"}
             </Button>
           </div>
         </form>

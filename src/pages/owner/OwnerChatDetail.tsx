@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage, OrderItem } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChatData {
   id: string;
@@ -45,6 +46,7 @@ export default function OwnerChatDetail() {
 
   const [chatDataState, setChatDataState] = useState<ChatData | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Map convenience name
   const chatData = chatDataState;
@@ -80,6 +82,7 @@ export default function OwnerChatDetail() {
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
     async function load() {
+      setIsLoading(true);
       if (!id) return;
       // load chat
       const { data: chatRow } = (await supabase
@@ -134,7 +137,7 @@ export default function OwnerChatDetail() {
             read: !!m.read,
             messageType: m.message_type as any,
             dealAmount: m.deal_amount ?? undefined,
-          }) as ChatMessage,
+          } as ChatMessage),
       );
       setMessages(mapped);
 
@@ -182,6 +185,8 @@ export default function OwnerChatDetail() {
           },
         )
         .subscribe();
+
+      setIsLoading(false);
     }
 
     load();
@@ -516,6 +521,71 @@ export default function OwnerChatDetail() {
 
   const isMyMessage = (senderRole: string) => senderRole === "store";
 
+  if (isLoading) {
+    return (
+      <AppLayout hideNav>
+        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full lg:my-6 lg:rounded-2xl lg:border lg:border-border lg:overflow-hidden lg:shadow-lg bg-background">
+          {/* Header Skeleton */}
+          <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 safe-area-top">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="flex-1">
+              <Skeleton className="h-5 w-24 mb-1" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <Skeleton className="w-10 h-10 rounded-full" />
+          </div>
+
+          {/* Product Header Skeleton */}
+          <div className="bg-card border-b border-border">
+            <div className="w-full px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="w-4 h-4" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Messages Skeleton */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`flex ${
+                  i % 2 === 0 ? "justify-end" : "justify-start"
+                }`}>
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                    i % 2 === 0
+                      ? "bg-primary rounded-br-md"
+                      : "bg-card border border-border rounded-bl-md"
+                  }`}>
+                  <Skeleton className="h-4 w-48 mb-1" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Input Skeleton */}
+          <div className="bg-card border-t border-border p-4 safe-area-bottom">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <Skeleton className="flex-1 h-10" />
+              <Skeleton className="w-10 h-10 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   const renderMessage = (message: ChatMessage) => {
     const isMine = isMyMessage(message.senderRole);
 
@@ -549,8 +619,8 @@ export default function OwnerChatDetail() {
                 ? "bg-primary/20 border-2 border-primary rounded-br-md"
                 : "bg-primary text-primary-foreground rounded-br-md"
               : message.messageType === "price_proposal"
-                ? "bg-card border-2 border-primary rounded-bl-md"
-                : "bg-card border border-border rounded-bl-md"
+              ? "bg-card border-2 border-primary rounded-bl-md"
+              : "bg-card border border-border rounded-bl-md"
           }`}>
           {message.imageUrl && (
             <img
@@ -639,8 +709,8 @@ export default function OwnerChatDetail() {
                 {agreedPrice
                   ? `${agreedPrice?.toLocaleString()}₮`
                   : chatData?.expectedPrice
-                    ? `~${chatData.expectedPrice?.toLocaleString()}₮`
-                    : "—"}
+                  ? `~${chatData.expectedPrice?.toLocaleString()}₮`
+                  : "—"}
               </Badge>
               {showProductHeader ? (
                 <ChevronUp className="w-4 h-4" />

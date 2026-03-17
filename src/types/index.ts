@@ -84,6 +84,8 @@ export interface Order {
   agreedPrice?: number;
   totalAmount: number;
   deliveryAddress?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
   serviceDescription?: string;
   createdAt: Date;
   confirmedAt?: Date;

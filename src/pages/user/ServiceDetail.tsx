@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -24,6 +25,7 @@ const ServiceDetail = () => {
   const navigate = useNavigate();
   const [jobDescription, setJobDescription] = useState("");
   const [expectedBudget, setExpectedBudget] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const [worker, setWorker] = useState<{
     id: string;
@@ -82,8 +84,10 @@ const ServiceDetail = () => {
           phone: profile?.phone ?? undefined,
           description: w.description ?? undefined,
         });
+        setLoading(false);
       } catch (err) {
         console.error("Failed to load worker:", err);
+        setLoading(false);
       }
     };
 
@@ -93,6 +97,122 @@ const ServiceDetail = () => {
       mounted = false;
     };
   }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+            {/* Left Column - Worker Profile Skeleton */}
+            <div className="lg:col-span-2">
+              {/* Header Skeleton */}
+              <div className="bg-gradient-to-br from-primary/10 to-accent/10 pt-4 pb-8 lg:rounded-2xl lg:mt-6 lg:mx-6">
+                <div className="px-4 lg:px-6">
+                  {/* Back Button Skeleton */}
+                  <Skeleton className="w-10 h-10 rounded-full mb-4" />
+
+                  {/* Profile Skeleton */}
+                  <div className="flex flex-col items-center md:flex-row md:items-start md:gap-6">
+                    <Skeleton className="w-28 h-28 md:w-32 md:h-32 rounded-full" />
+                    <div className="text-center md:text-left mt-4 md:mt-0">
+                      <Skeleton className="h-8 w-48 mb-2" />
+                      <Skeleton className="h-5 w-32 mb-3" />
+                      <div className="flex items-center gap-4 justify-center md:justify-start">
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="w-1 h-1 rounded-full" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                      {/* Badges Skeleton */}
+                      <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Skeleton */}
+              <div className="px-4 lg:px-6 -mt-4">
+                <div className="bg-card rounded-2xl p-4 md:p-6 shadow-lg border border-border">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <Skeleton className="h-8 w-20 mx-auto mb-1" />
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-8 w-16 mx-auto mb-1" />
+                      <Skeleton className="h-4 w-20 mx-auto" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-8 w-12 mx-auto mb-1" />
+                      <Skeleton className="h-4 w-12 mx-auto" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <Skeleton className="h-6 w-24 mb-2" />
+                <Skeleton className="h-4 w-full mb-1" />
+                <Skeleton className="h-4 w-3/4 mb-1" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+
+              {/* Quick Actions Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <div className="flex gap-3">
+                  <Skeleton className="h-10 flex-1 rounded-lg" />
+                  <Skeleton className="h-10 flex-1 rounded-lg" />
+                </div>
+              </div>
+
+              {/* Reviews Skeleton */}
+              <div className="px-4 lg:px-6 mt-6">
+                <Skeleton className="h-6 w-32 mb-3" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="bg-card rounded-xl p-4 border border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <Skeleton className="h-5 w-20" />
+                        <div className="flex gap-1">
+                          <Skeleton className="w-3 h-3 rounded-full" />
+                          <Skeleton className="w-3 h-3 rounded-full" />
+                          <Skeleton className="w-3 h-3 rounded-full" />
+                          <Skeleton className="w-3 h-3 rounded-full" />
+                          <Skeleton className="w-3 h-3 rounded-full" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-3/4 mb-2" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Request Service Skeleton */}
+            <div className="lg:col-span-1 px-4 lg:px-0 mt-6 lg:mt-0">
+              <div className="lg:sticky lg:top-6 lg:mr-6 lg:mt-6">
+                <div className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-lg">
+                  <Skeleton className="h-6 w-40 mb-3" />
+                  <div className="space-y-3">
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!worker) {
     return (

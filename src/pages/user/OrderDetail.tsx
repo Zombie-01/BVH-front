@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type {
@@ -167,6 +168,159 @@ const OrderDetail = () => {
   }
 
   // Guard for TypeScript — if we're still loading, render nothing until order is available
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Skeleton */}
+          <div className="bg-gradient-to-br from-primary/10 to-accent/10 px-4 lg:px-6 pt-4 pb-6 lg:rounded-2xl lg:mt-6 lg:mx-6">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div>
+                <Skeleton className="h-6 w-48 mb-1" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+            {/* Left Column - Main Content Skeleton */}
+            <div className="lg:col-span-2">
+              {/* Status Card Skeleton */}
+              <div className="px-4 lg:px-6 -mt-4">
+                <div className="bg-card rounded-2xl p-4 md:p-6 shadow-lg border border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-12 h-12 md:w-14 md:h-14 rounded-full" />
+                      <div>
+                        <Skeleton className="h-5 w-32 mb-1" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Skeleton className="h-5 w-16 mb-1" />
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-12 w-full mt-4 rounded-lg" />
+                </div>
+              </div>
+
+              {/* Store/Worker Info Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <div className="bg-card rounded-xl p-4 border border-border">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-14 h-14 md:w-16 md:h-16 rounded-xl" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-32 mb-1" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Description Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <div className="bg-card rounded-xl p-4 border border-border">
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-24 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Address Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <div className="bg-card rounded-xl p-4 border border-border">
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-32 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Driver Info Skeleton */}
+              <div className="px-4 lg:px-6 mt-4">
+                <div className="bg-card rounded-xl p-4 border border-border">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-12 h-12 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-16 mb-1" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Items Skeleton */}
+              <div className="px-4 lg:px-6 mt-6">
+                <Skeleton className="h-6 w-40 mb-4" />
+                <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center gap-3 p-4 ${
+                        index < 2 ? "border-b border-border" : ""
+                      }`}>
+                      <Skeleton className="w-12 h-12 md:w-14 md:h-14 rounded-lg" />
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-32 mb-1" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                  ))}
+                  <div className="p-4 bg-muted/50">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Timeline & Actions Skeleton */}
+            <div className="lg:col-span-1 px-4 lg:px-0 mt-6 lg:mt-0">
+              <div className="lg:sticky lg:top-6 lg:mr-6 space-y-6">
+                {/* Timeline Skeleton */}
+                <div className="bg-card rounded-2xl border border-border p-4 md:p-6">
+                  <Skeleton className="h-6 w-16 mb-4" />
+                  <div className="space-y-4">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="flex flex-col items-center">
+                          <Skeleton className="w-8 h-8 rounded-full" />
+                          {index < 4 && <Skeleton className="w-0.5 h-8" />}
+                        </div>
+                        <div className="pt-1 flex-1">
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions Skeleton */}
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!order) return null;
 
   const getStatusInfo = (status: string) => {
@@ -544,13 +698,19 @@ const OrderDetail = () => {
                         </div>
                         {index < timeline.length - 1 && (
                           <div
-                            className={`w-0.5 h-8 ${step.completed ? "bg-primary" : "bg-muted"}`}
+                            className={`w-0.5 h-8 ${
+                              step.completed ? "bg-primary" : "bg-muted"
+                            }`}
                           />
                         )}
                       </div>
                       <div className="pt-1">
                         <p
-                          className={`font-medium ${step.completed ? "text-foreground" : "text-muted-foreground"}`}>
+                          className={`font-medium ${
+                            step.completed
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          }`}>
                           {step.title}
                         </p>
                       </div>

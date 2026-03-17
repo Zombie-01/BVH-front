@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Store, Product, OrderItem } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CartItem {
   productId: string;
@@ -91,6 +92,109 @@ const StoreDetail = () => {
       mounted = false;
     };
   }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-32">
+        <div className="max-w-7xl mx-auto">
+          {/* Desktop/Tablet Layout */}
+          <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+            {/* Left Column - Store Info */}
+            <div className="lg:col-span-2">
+              {/* Header Image Skeleton */}
+              <div className="relative h-56 md:h-72 lg:h-80 lg:rounded-2xl lg:overflow-hidden lg:mt-6 lg:mx-6">
+                <Skeleton className="w-full h-full rounded-2xl" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+
+                {/* Back Button */}
+                <Skeleton className="absolute top-4 left-4 w-10 h-10 rounded-full" />
+
+                {/* Chat Button */}
+                <Skeleton className="absolute top-4 right-4 w-10 h-10 rounded-full" />
+              </div>
+
+              {/* Store Info Skeleton */}
+              <div className="px-4 lg:px-6 -mt-8 relative z-10">
+                <div className="bg-card rounded-2xl p-4 md:p-6 shadow-lg border border-border">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </div>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+
+                  <div className="flex items-center gap-4 mt-4">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <Skeleton className="h-9 flex-1" />
+                    <Skeleton className="h-9 flex-1" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Products Skeleton */}
+              <div className="px-4 lg:px-6 mt-6">
+                <Skeleton className="h-6 w-32 mb-4" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="bg-card rounded-xl p-3 border border-border flex gap-3">
+                      <Skeleton className="w-20 h-20 md:w-24 md:h-24 rounded-lg flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Skeleton className="h-5 w-3/4 mb-1" />
+                        <Skeleton className="h-3 w-full mb-1" />
+                        <Skeleton className="h-3 w-2/3 mb-2" />
+                        <div className="flex items-center justify-between mt-2">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-8 w-20" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Cart Summary Skeleton (Desktop) */}
+            <div className="hidden lg:block lg:col-span-1">
+              <div className="sticky top-6 mt-6 mr-6">
+                <div className="bg-card rounded-2xl border border-border p-6 shadow-lg">
+                  <Skeleton className="h-6 w-24 mb-4" />
+
+                  <div className="space-y-3 max-h-64 mb-4">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <Skeleton className="w-12 h-12 rounded-lg" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-3/4 mb-1" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!store && !loading) {
     return (

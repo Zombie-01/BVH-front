@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OrderStatus } from "@/types";
+import LocationPicker from "@/components/LocationPicker";
 
 interface OrderItem {
   name: string;
@@ -36,6 +37,8 @@ interface OrderFormData {
   items: OrderItem[];
   status: OrderStatus;
   deliveryAddress: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
   notes?: string;
 }
 
@@ -61,6 +64,8 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
     items: [{ name: "", quantity: 1, price: 0 }],
     status: "pending",
     deliveryAddress: "",
+    deliveryLat: undefined,
+    deliveryLng: undefined,
     notes: "",
   });
 
@@ -71,6 +76,8 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
         items: [{ name: "", quantity: 1, price: 0 }],
         status: "pending",
         deliveryAddress: "",
+        deliveryLat: undefined,
+        deliveryLng: undefined,
         notes: "",
       });
     }
@@ -175,6 +182,19 @@ export function OrderModal({ open, onOpenChange, onSave }: OrderModalProps) {
               placeholder="Дүүрэг, хороо, байр, орц, давхар..."
               rows={2}
               required
+            />
+            <LocationPicker
+              initialLat={formData.deliveryLat}
+              initialLng={formData.deliveryLng}
+              onLocationSelect={(lat, lng) =>
+                setFormData({
+                  ...formData,
+                  deliveryLat: lat,
+                  deliveryLng: lng,
+                })
+              }
+              height="200px"
+              placeholder="Газрын зураг дээр хүргэлтийн байршлыг сонгоно уу"
             />
           </div>
 

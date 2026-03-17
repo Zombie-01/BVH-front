@@ -10,6 +10,7 @@ import { CategoryPill } from "@/components/common/CategoryPill";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Store } from "@/types"; // App shape for UI components
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Stores() {
   const navigate = useNavigate();
@@ -143,21 +144,45 @@ export default function Stores() {
       {/* Stores Grid */}
       <section className="px-4 lg:px-6 pb-6 max-w-7xl mx-auto">
         <p className="text-sm text-muted-foreground mb-4">
-          {filteredStores.length} дэлгүүр олдлоо
+          {loading
+            ? "Татаж байна..."
+            : `${filteredStores.length} дэлгүүр олдлоо`}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredStores.map((store, index) => (
-            <motion.div
-              key={store.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * Math.min(index, 8) }}>
-              <StoreCard
-                store={store}
-                onClick={() => navigate(`/stores/${store.id}`)}
-              />
-            </motion.div>
-          ))}
+          {loading
+            ? // Show skeleton cards while loading
+              Array.from({ length: 8 }).map((_, index) => (
+                <motion.div
+                  key={`skeleton-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * index }}
+                  className="bg-card rounded-2xl overflow-hidden shadow-card">
+                  <Skeleton className="w-full h-40" />
+                  <div className="p-4">
+                    <Skeleton className="h-5 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full mb-1" />
+                    <Skeleton className="h-4 w-2/3 mb-3" />
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            : // Show actual store cards when loaded
+              filteredStores.map((store, index) => (
+                <motion.div
+                  key={store.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * Math.min(index, 8) }}>
+                  <StoreCard
+                    store={store}
+                    onClick={() => navigate(`/stores/${store.id}`)}
+                  />
+                </motion.div>
+              ))}
         </div>
       </section>
     </AppLayout>
