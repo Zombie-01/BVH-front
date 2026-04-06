@@ -150,8 +150,8 @@ Error: Permission denied (os error 13)
 ## Version Info
 
 - **Package:** com.narmandakh.buh
-- **Current versionCode:** 8
-- **Current versionName:** 1.0.8
+- **Current versionCode:** 9
+- **Current versionName:** 1.0.9
 - **minSdkVersion:** See `android/variables.gradle`
 - **targetSdkVersion:** See `android/variables.gradle`
 
