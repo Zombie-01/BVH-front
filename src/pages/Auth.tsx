@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -84,7 +85,7 @@ export default function Auth() {
         navigate("/home");
         return;
       }
-      const role = profile.role;
+      const role = (profile as any).role;
       if (role === "store_owner") navigate("/owner/dashboard");
       else if (role === "driver") navigate("/driver/tasks");
       else if (role === "service_worker") navigate("/worker/jobs");
@@ -140,7 +141,7 @@ export default function Auth() {
             .select("role")
             .eq("id", userId)
             .single();
-          const role = profile?.role;
+          const role = (profile as any)?.role;
           if (role === "store_owner") navigate("/owner/dashboard");
           else if (role === "driver") navigate("/driver/tasks");
           else if (role === "service_worker") navigate("/worker/jobs");
@@ -168,7 +169,7 @@ export default function Auth() {
             .select("role")
             .eq("id", userId)
             .single();
-          const role = profile?.role;
+          const role = (profile as any)?.role;
           if (role === "store_owner") navigate("/owner/dashboard");
           else if (role === "driver") navigate("/driver/tasks");
           else if (role === "service_worker") navigate("/worker/jobs");
