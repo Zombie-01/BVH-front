@@ -235,31 +235,6 @@ const ServiceDetail = () => {
     });
   };
 
-  // Mock reviews
-  const reviews = [
-    {
-      id: "1",
-      userName: "Болд Б.",
-      rating: 5,
-      comment: "Маш сайн ажилласан, цаг баримталсан.",
-      date: "2024-01-10",
-    },
-    {
-      id: "2",
-      userName: "Сүхбат Г.",
-      rating: 5,
-      comment: "Чанартай, үнэ боломжийн.",
-      date: "2024-01-08",
-    },
-    {
-      id: "3",
-      userName: "Батбаяр Н.",
-      rating: 4,
-      comment: "Сайн ажил хийсэн.",
-      date: "2024-01-05",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-background pb-8">
       <div className="max-w-7xl mx-auto">
@@ -379,8 +354,7 @@ const ServiceDetail = () => {
               </motion.div>
             )}
 
-            {/* Quick Actions */}
-            <div className="px-4 lg:px-6 mt-4">
+            {/* <div className="px-4 lg:px-6 mt-4">
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1">
                   <Phone className="w-4 h-4 mr-2" />
@@ -391,42 +365,20 @@ const ServiceDetail = () => {
                   Цаг товлох
                 </Button>
               </div>
-            </div>
+            </div> */}
 
             {/* Reviews */}
             <div className="px-4 lg:px-6 mt-6">
               <h2 className="text-lg font-bold text-foreground mb-3">
                 Сэтгэгдлүүд
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {reviews.map((review, index) => (
-                  <motion.div
-                    key={review.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + index * 0.05 }}
-                    className="bg-card rounded-xl p-4 border border-border">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">
-                        {review.userName}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: review.rating }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className="w-3 h-3 text-yellow-500 fill-yellow-500"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {review.comment}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {review.date}
-                    </p>
-                  </motion.div>
-                ))}
+              <div className="bg-card rounded-xl p-6 border border-border text-center">
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Star className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground">
+                  Сэтгэгдэл нэмэгдээд эхлээгүй байна
+                </p>
               </div>
             </div>
           </div>

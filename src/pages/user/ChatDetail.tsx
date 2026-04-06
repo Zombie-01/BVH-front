@@ -278,8 +278,8 @@ const ChatDetail = () => {
     existingChat?.status === "agreed"
       ? "agreed"
       : id?.startsWith("new")
-        ? "initial"
-        : "negotiating",
+      ? "initial"
+      : "negotiating",
   );
   const [agreedPrice, setAgreedPrice] = useState<number | null>(
     existingChat?.agreed_price ?? null,
@@ -347,8 +347,8 @@ const ChatDetail = () => {
         const senderRole = res.chat.store_id
           ? "store"
           : res.chat.worker_id
-            ? "worker"
-            : "system";
+          ? "worker"
+          : "system";
         const accPayload = {
           chat_id: res.chat.id,
           sender_id: senderId as string,
@@ -446,8 +446,8 @@ const ChatDetail = () => {
       const senderRole = existingChat?.store_id
         ? "store"
         : existingChat?.worker_id
-          ? "worker"
-          : "system";
+        ? "worker"
+        : "system";
       const acceptPayload = {
         chat_id: id,
         sender_id: senderId as string,
@@ -675,8 +675,8 @@ const ChatDetail = () => {
       const senderRole = existingChat?.store_id
         ? "store"
         : existingChat?.worker_id
-          ? "worker"
-          : "system";
+        ? "worker"
+        : "system";
       const acceptPayload = {
         chat_id: id,
         sender_id: senderId as string,
@@ -757,8 +757,8 @@ const ChatDetail = () => {
         const senderRole = existingChat?.store_id
           ? "store"
           : existingChat?.worker_id
-            ? "worker"
-            : "system";
+          ? "worker"
+          : "system";
         const payload = {
           chat_id: id,
           sender_id: senderId as string,
@@ -1202,8 +1202,8 @@ const ChatDetail = () => {
                 ? "bg-primary/20 border-2 border-primary rounded-br-md"
                 : "bg-primary text-primary-foreground rounded-br-md"
               : message.messageType === "price_proposal"
-                ? "bg-card border-2 border-primary rounded-bl-md"
-                : "bg-card border border-border rounded-bl-md"
+              ? "bg-card border-2 border-primary rounded-bl-md"
+              : "bg-card border border-border rounded-bl-md"
           }`}>
           {message.imageUrl && (
             <img
@@ -1254,16 +1254,10 @@ const ChatDetail = () => {
               {chatStatus === "agreed"
                 ? "Тохиролцсон ✓"
                 : chatStatus === "negotiating"
-                  ? "Үнэ тохиролцож байна..."
-                  : "Чат эхэллээ"}
+                ? "Үнэ тохиролцож байна..."
+                : "Чат эхэллээ"}
             </p>
           </div>
-          <button className="w-10 h-10 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors">
-            <Phone className="w-5 h-5 text-foreground" />
-          </button>
-          <button className="w-10 h-10 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80 transition-colors">
-            <MoreVertical className="w-5 h-5 text-foreground" />
-          </button>
         </div>
 
         {/* Sticky Product/Service Header */}

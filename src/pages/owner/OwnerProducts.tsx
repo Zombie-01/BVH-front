@@ -68,9 +68,8 @@ export default function OwnerProducts() {
         .eq("owner_id", user.id)
         .maybeSingle();
       if (storeErr) throw storeErr;
-      const storeRow = storeData as
-        | Database["public"]["Tables"]["stores"]["Row"]
-        | null;
+
+      const storeRow = storeData as { id: string; categories?: any[] } | null;
       const sid = storeRow?.id ?? null;
       setStoreId(sid);
 
@@ -105,13 +104,13 @@ export default function OwnerProducts() {
         if (
           cats &&
           cats.length > 0 &&
-          storeData &&
-          storeData.categories?.length > 0
+          storeRow &&
+          storeRow?.categories?.length > 0
         ) {
           setStoreCategories(cats);
           setProductCategories([
             "all",
-            ...storeData.categories.map((cat: any) => cat),
+            ...storeRow.categories.map((cat: any) => cat),
           ]);
         } else {
           setStoreCategories([]);

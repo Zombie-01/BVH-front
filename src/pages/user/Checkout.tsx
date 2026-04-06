@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -14,12 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { mockProducts } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface CartItem {
   productId: string;
   quantity: number;
 }
+
+type Product = Database["public"]["Tables"]["products"]["Row"];
 
 const Checkout = () => {
   const location = useLocation();
@@ -42,6 +45,30 @@ const Checkout = () => {
   const [notes, setNotes] = useState("");
   const [deliveryOption, setDeliveryOption] = useState("standard");
   const [isOrderPlaced, setIsOrderPlaced] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // Fetch product details for cart items
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (cart.length === 0) return;
+
+      try {
+        const productIds = cart.map((item) => item.productId);
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .in("id", productIds);
+
+        if (error) throw error;
+        setProducts(data || []);
+      } catch (err) {
+        // If fetch fails, continue with empty products
+        console.error("Error fetching products:", err);
+      }
+    };
+
+    fetchProducts();
+  }, [cart]);
 
   // Calculate delivery fee based on option
   const deliveryFees = {
@@ -55,7 +82,7 @@ const Checkout = () => {
 
   const cartProducts = cart
     .map((item) => {
-      const product = mockProducts.find((p) => p.id === item.productId);
+      const product = products.find((p) => p.id === item.productId);
       return { ...item, product };
     })
     .filter((item) => item.product);
@@ -136,7 +163,9 @@ const Checkout = () => {
                   </div>
                   {s < 3 && (
                     <div
-                      className={`w-12 md:w-20 h-1 mx-2 ${step > s ? "bg-primary" : "bg-muted"}`}
+                      className={`w-12 md:w-20 h-1 mx-2 ${
+                        step > s ? "bg-primary" : "bg-muted"
+                      }`}
                     />
                   )}
                 </div>
@@ -357,15 +386,15 @@ const Checkout = () => {
                           {deliveryOption === "standard"
                             ? "Энгийн хүргэлт"
                             : deliveryOption === "express"
-                              ? "Шуурхай хүргэлт"
-                              : "Өөрөө авах"}
+                            ? "Шуурхай хүргэлт"
+                            : "Өөрөө авах"}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {deliveryOption === "standard"
                             ? "2-4 цагийн дотор"
                             : deliveryOption === "express"
-                              ? "1 цагийн дотор"
-                              : "Дэлгүүрээс"}
+                            ? "1 цагийн дотор"
+                            : "Дэлгүүрээс"}
                         </p>
                       </div>
                     </div>

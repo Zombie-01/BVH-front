@@ -49,8 +49,40 @@ import WorkerChatDetail from "./pages/worker/WorkerChatDetail";
 
 const queryClient = new QueryClient();
 
+// Version checking hook
+function useVersionCheck() {
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch("/version.json");
+        const data = await response.json();
+        const storedVersion = localStorage.getItem("app-version");
+
+        if (storedVersion && storedVersion !== data.version) {
+          localStorage.setItem("app-version", data.version);
+          // Reload page to get latest version
+          window.location.reload();
+        } else if (!storedVersion) {
+          localStorage.setItem("app-version", data.version);
+        }
+      } catch (error) {
+        // Version check failed - continue normally (offline or error)
+      }
+    };
+
+    // Check version on app start
+    checkVersion();
+
+    // Check every 60 seconds for updates
+    const interval = setInterval(checkVersion, 60000);
+    return () => clearInterval(interval);
+  }, []);
+}
+
 // Inner component that uses splash screen context
 function AppContent() {
+  useVersionCheck();
+
   return (
     <>
       <TooltipProvider>

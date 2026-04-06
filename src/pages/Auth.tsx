@@ -243,7 +243,7 @@ export default function Auth() {
           </div>
 
           {/* Google Login */}
-          <Button
+          {/* <Button
             variant="outline"
             className="w-full h-12 gap-3"
             onClick={handleGoogleAuth}
@@ -271,9 +271,9 @@ export default function Auth() {
               </svg>
             )}
             Google-ээр нэвтрэх
-          </Button>
+          </Button> */}
 
-          <div className="relative">
+          {/* <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border" />
             </div>
@@ -282,7 +282,7 @@ export default function Auth() {
                 эсвэл
               </span>
             </div>
-          </div>
+          </div> */}
 
           {/* Email Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4">

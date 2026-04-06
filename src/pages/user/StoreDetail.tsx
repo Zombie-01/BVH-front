@@ -295,23 +295,6 @@ const StoreDetail = () => {
                 className="absolute top-4 left-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
                 <ArrowLeft className="w-5 h-5 text-foreground" />
               </button>
-
-              {/* Chat Button */}
-              <button
-                onClick={() =>
-                  navigate(`/chat/new-${store?.id}`, {
-                    state: {
-                      type: "store",
-                      name: store?.name,
-                      storeId: store?.id,
-                      items: [],
-                      expectedPrice: 0,
-                    },
-                  })
-                }
-                className="absolute top-4 right-4 w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                <MessageCircle className="w-5 h-5 text-primary-foreground" />
-              </button>
             </div>
 
             {/* Store Info */}
@@ -348,7 +331,7 @@ const StoreDetail = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 mt-4">
+                {/* <div className="flex gap-2 mt-4">
                   <Button variant="outline" size="sm" className="flex-1">
                     <Phone className="w-4 h-4 mr-2" />
                     Залгах
@@ -371,7 +354,7 @@ const StoreDetail = () => {
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Чат
                   </Button>
-                </div>
+                </div> */}
               </div>
             </motion.div>
 
